@@ -59,7 +59,7 @@ def atoffice():
 
 
         # Chronoterm module
-        elif re.match(r"^(now|world|tz|alarm|sw)\b", command):
+        elif re.match(r"^(now|time|world|tz|alarm|sw)\b", command):
             try:
                 chronoterm_app(shlex.split(raw_command))
             except SystemExit:
