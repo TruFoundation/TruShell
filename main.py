@@ -30,9 +30,9 @@ def atoffice():
         if command in ["exit", "quit"]:
             break
         elif command == "joke":
-            joke()
+            print(joke())
         elif command == "joke_trex":
-            joke_trex()
+            print(joke_trex())
 
       
         # ToDoCLI module

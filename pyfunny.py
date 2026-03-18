@@ -2,34 +2,47 @@ import cowsay
 import pyjokes
 
 import typer
+from pathlib import Path
 
 from playsound import playsound
-import random
+
+from chronoterm.state import StateStore
 
 app = typer.Typer(help="Joke REPL: Type 'cow', 'trex', or 'exit'.")
+
+DEFAULT_JOKE_CHARACTER = "cow"
+DEFAULT_JOKE_SOUND = "cow-sound.mp3"
+
+
+def _render_joke(character_name: str, text: str) -> str:
+    speaker = getattr(cowsay, character_name, None)
+    if not callable(speaker):
+        speaker = cowsay.cow
+    return speaker(text)
+
+
+def _sound_path(filename: str) -> str:
+    return str(Path(__file__).resolve().parent / "chronoterm" / "sounds" / filename)
 
 # Individual Commands
 
 @app.command()
 def joke():
     joke = pyjokes.get_joke()
-    
-    # Play sound, and show joke
-    playsound(r'chronoterm/sounds/faaah-sound.mp3')
-    return cowsay.cow(joke)
-    
-    
+    state = StateStore().load()
+    sound_file = state.joke_sound or DEFAULT_JOKE_SOUND
+    character_name = state.joke_character or DEFAULT_JOKE_CHARACTER
 
-# Use an absolute path for reliability (e.g., 'C:\\Users\\YourUser\\Music\\song.mp3')
-# Place an 'r' before the string to handle backslashes correctly in Windows paths
-
-    playsound(audio_file_path)
+    playsound(_sound_path(sound_file))
+    return _render_joke(character_name, joke)
 
 @app.command()
 def joke_trex():
     joke = pyjokes.get_joke()
 
     
+    # Play only one of them. Either trex-sound or bruh-sound.
+    playsound(r'chronoterm/sounds/trex-sound.mp3')
     playsound(r'chronoterm/sounds/bruh-sound.mp3')
     return cowsay.trex(joke)
 

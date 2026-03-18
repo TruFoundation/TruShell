@@ -1,6 +1,7 @@
 import os
 import msvcrt
 import typer
+from pathlib import Path
 
 from chronoterm.state import StateStore
 
@@ -25,6 +26,19 @@ TIME_TEMPLATES = [
     ("lcd", "LCD Display"),
     ("wrist_watch", "Wrist Watch"),
     ("desktop", "Desktop Clock"),
+]
+
+JOKE_CHARACTERS = [
+    "cow",
+    "trex",
+    "dragon",
+    "tux",
+    "kitty",
+    "turkey",
+    "stegosaurus",
+    "ghostbusters",
+    "pig",
+    "daemon",
 ]
 
 
@@ -59,26 +73,74 @@ def _select_from_menu(title: str, options: list[str]) -> str | None:
             return None
 
 
+def _available_sound_files() -> list[str]:
+    sounds_dir = Path(__file__).resolve().parent / "chronoterm" / "sounds"
+    if not sounds_dir.exists():
+        return []
+    return sorted(path.name for path in sounds_dir.iterdir() if path.is_file())
+
+
 def _command_settings(command_name: str) -> None:
-    if command_name != "time":
-        typer.secho(f"No editable settings are available yet for '{command_name}'.", fg=typer.colors.YELLOW)
-        return
-
-    selected_label = _select_from_menu(
-        "Select a template for the time command:",
-        [label for _, label in TIME_TEMPLATES],
-    )
-    if selected_label is None:
-        typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
-        return
-
-    template_lookup = {label: key for key, label in TIME_TEMPLATES}
     store = StateStore()
     state = store.load()
-    state.time_template = template_lookup[selected_label]
-    store.save(state)
 
-    typer.secho(f"Time template updated to {selected_label}.", fg=typer.colors.GREEN)
+    if command_name == "time":
+        selected_label = _select_from_menu(
+            "Select a template for the time command:",
+            [label for _, label in TIME_TEMPLATES],
+        )
+        if selected_label is None:
+            typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
+            return
+
+        template_lookup = {label: key for key, label in TIME_TEMPLATES}
+        state.time_template = template_lookup[selected_label]
+        store.save(state)
+        typer.secho(f"Time template updated to {selected_label}.", fg=typer.colors.GREEN)
+        return
+
+    if command_name == "joke":
+        selected_setting = _select_from_menu(
+            "Select a joke setting to edit:",
+            ["Character", "Sound"],
+        )
+        if selected_setting is None:
+            typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
+            return
+
+        if selected_setting == "Character":
+            selected_character = _select_from_menu(
+                "Select a character for the joke command:",
+                JOKE_CHARACTERS,
+            )
+            if selected_character is None:
+                typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
+                return
+
+            state.joke_character = selected_character
+            store.save(state)
+            typer.secho(f"Joke character updated to {selected_character}.", fg=typer.colors.GREEN)
+            return
+
+        sound_files = _available_sound_files()
+        if not sound_files:
+            typer.secho("No sound files were found in chronoterm/sounds.", fg=typer.colors.RED)
+            return
+
+        selected_sound = _select_from_menu(
+            "Select a sound for the joke command:",
+            sound_files,
+        )
+        if selected_sound is None:
+            typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
+            return
+
+        state.joke_sound = selected_sound
+        store.save(state)
+        typer.secho(f"Joke sound updated to {selected_sound}.", fg=typer.colors.GREEN)
+        return
+
+    typer.secho(f"No editable settings are available yet for '{command_name}'.", fg=typer.colors.YELLOW)
 
 
 def launch_settings() -> None:

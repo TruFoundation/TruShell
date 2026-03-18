@@ -31,6 +31,8 @@ class AppState:
     timezones: list[str] = field(default_factory=list)
     alarms: list[dict[str, Any]] = field(default_factory=list)
     time_template: str = "lcd"
+    joke_character: str = "cow"
+    joke_sound: str = "cow-sound.mp3"
     version: int = 1
     updated_at_iso: str | None = None
 
@@ -58,6 +60,8 @@ class StateStore:
             tzs = data.get("timezones")
             alarms = data.get("alarms")
             time_template = data.get("time_template")
+            joke_character = data.get("joke_character")
+            joke_sound = data.get("joke_sound")
             version = data.get("version")
             updated_at_iso = data.get("updated_at_iso")
 
@@ -67,6 +71,10 @@ class StateStore:
                 state.alarms = alarms  # validated by callers
             if isinstance(time_template, str):
                 state.time_template = time_template
+            if isinstance(joke_character, str):
+                state.joke_character = joke_character
+            if isinstance(joke_sound, str):
+                state.joke_sound = joke_sound
             if isinstance(version, int):
                 state.version = version
             if isinstance(updated_at_iso, str) or updated_at_iso is None:
@@ -82,6 +90,8 @@ class StateStore:
             "timezones": state.timezones,
             "alarms": state.alarms,
             "time_template": state.time_template,
+            "joke_character": state.joke_character,
+            "joke_sound": state.joke_sound,
         }
         _atomic_write_text(self.path, json.dumps(payload, indent=2, ensure_ascii=False))
 
