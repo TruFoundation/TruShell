@@ -1,10 +1,11 @@
 from pyfunny import joke, joke_trex
 from todocli import addtask, deletetask, updatetask, completetask, showtask
 
-from chronoterm.shell import now, world, tz, alarm, sw, shell, run
+from chronoterm.shell import app as chronoterm_app
 
 import typer
 import re
+import shlex
 
 
 app = typer.Typer(help="Joke REPL: Type 'cow', 'trex', or 'exit'.")
@@ -19,7 +20,8 @@ def atoffice():
     # The Loop
     while True:
         # Shell prompt
-        command = typer.prompt("atoffice-shell").lower().strip()
+        raw_command = typer.prompt("atoffice-shell").strip()
+        command = raw_command.lower()
 
         
 
@@ -57,22 +59,12 @@ def atoffice():
 
 
         # Chronoterm module
-        elif command == "now":
-            now()
-        
-        elif command == "world":
-            world()
-        
-        elif command.startswith("tz"):
-            tz(command.replace("tz", "", 1).strip())
-        
-        elif match := re.match(r"^alarm(?:\s+(.*))?$", command):
-            args = match.group(1) or ""
-            alarm(args)
-
-        elif match := re.match(r"^sw(?:\s+(.*))?$", command):
-            args = match.group(1) or ""
-            sw(args)
+        elif re.match(r"^(now|world|tz|alarm|sw)\b", command):
+            try:
+                chronoterm_app(shlex.split(raw_command))
+            except SystemExit:
+                # Typer exits after each command; keep the at-office shell running.
+                pass
 
 
         # additionals...
