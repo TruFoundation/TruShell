@@ -8,12 +8,18 @@ from rich.console import Console
 from rich.text import Text
 from rich.table import Table
 
-
-from .alarms import AlarmManager
-from .state import StateStore
-from .stopwatch import Stopwatch
-from .timezones import TimezoneManager
-from .sound import play_alarm
+try:
+    from .alarms import AlarmManager
+    from .state import StateStore
+    from .stopwatch import Stopwatch
+    from .timezones import TimezoneManager
+    from .sound import play_alarm
+except ImportError:
+    from alarms import AlarmManager
+    from state import StateStore
+    from stopwatch import Stopwatch
+    from timezones import TimezoneManager
+    from sound import play_alarm
 
 app = typer.Typer(help="ChronoTerm — Type 'shell' for interactive mode or use commands directly.")
 console = Console()
@@ -154,6 +160,12 @@ def shell():
             continue
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
+
+def run_shell() -> None:
+    try:
+        shell()
+    finally:
+        chrono.alarms.stop_scheduler()
 
 def run():
     try:

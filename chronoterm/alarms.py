@@ -10,7 +10,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from rich.table import Table
 
-from .state import AppState, StateStore
+try:
+    from .state import AppState, StateStore
+except ImportError:
+    from state import AppState, StateStore
 
 
 def _local_tz() -> timezone | ZoneInfo:

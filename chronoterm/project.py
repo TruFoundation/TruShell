@@ -1,14 +1,14 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from shell import run
+from shell import run_shell
 from alarms import _parse_when
 from timezones import TimezoneManager
 from state import StateStore
 
 
 def main() -> None:
-    run()
+    run_shell()
 
 
 
