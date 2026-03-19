@@ -14,6 +14,13 @@ DEFAULT_JOKE_CHARACTER = "cow"
 DEFAULT_JOKE_SOUND = "cow-sound.mp3"
 
 
+def _joke_preferences() -> tuple[str, str]:
+    state = StateStore().load()
+    character_name = state.joke_character or DEFAULT_JOKE_CHARACTER
+    sound_file = state.joke_sound or DEFAULT_JOKE_SOUND
+    return character_name, sound_file
+
+
 def _render_joke(character_name: str, text: str) -> str:
     speaker = getattr(cowsay, character_name, None)
     if not callable(speaker):
@@ -28,23 +35,20 @@ def _sound_path(filename: str) -> str:
 
 @app.command()
 def joke():
-    joke = pyjokes.get_joke()
-    state = StateStore().load()
-    sound_file = state.joke_sound or DEFAULT_JOKE_SOUND
-    character_name = state.joke_character or DEFAULT_JOKE_CHARACTER
-
+    joke_text = pyjokes.get_joke()
+    character_name, sound_file = _joke_preferences()
     playsound(_sound_path(sound_file))
-    return _render_joke(character_name, joke)
+    return _render_joke(character_name, joke_text)
 
 @app.command()
 def joke_trex():
-    joke = pyjokes.get_joke()
+    joke_text = pyjokes.get_joke()
 
     
     # Play only one of them. Either trex-sound or bruh-sound.
     playsound(r'chronoterm/sounds/trex-sound.mp3')
     playsound(r'chronoterm/sounds/bruh-sound.mp3')
-    return cowsay.trex(joke)
+    return cowsay.trex(joke_text)
 
 # # Interactive Shell
 # @app.command()

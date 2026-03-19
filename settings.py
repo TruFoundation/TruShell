@@ -41,35 +41,54 @@ JOKE_CHARACTERS = [
 ]
 
 
-
 def _clear_screen() -> None:
     os.system("cls")
+
+
+def _show_cancelled_message() -> None:
+    typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
+
+
+def _show_selection_screen(title: str, options: list[str], index: int) -> None:
+    _clear_screen()
+    typer.secho(f"? {title}", fg=typer.colors.CYAN)
+    typer.secho("  Use arrow keys. Press Enter to select. Press Esc to go back.", fg=typer.colors.BRIGHT_BLACK)
+    typer.echo("")
+
+    current_index = 0
+    while current_index < len(options):
+        option = options[current_index]
+        prefix = ">" if current_index == index else " "
+        color = typer.colors.GREEN if current_index == index else typer.colors.WHITE
+        typer.secho(f"{prefix} {option}", fg=color)
+        current_index = current_index + 1
+
+
+def _read_menu_key(index: int, total: int) -> tuple[int, bool, bool]:
+    key = msvcrt.getwch()
+    if key in ("\x00", "\xe0"):
+        arrow = msvcrt.getwch()
+        if arrow == "H":
+            index = (index - 1) % total
+        elif arrow == "P":
+            index = (index + 1) % total
+        return index, False, False
+    if key == "\r":
+        return index, True, False
+    if key == "\x1b":
+        return index, False, True
+    return index, False, False
 
 
 def _select_from_menu(title: str, options: list[str]) -> str | None:
     index = 0
 
     while True:
-        _clear_screen()
-        typer.secho(f"? {title}", fg=typer.colors.CYAN)
-        typer.secho("  Use arrow keys. Press Enter to select. Press Esc to go back.", fg=typer.colors.BRIGHT_BLACK)
-        typer.echo("")
-
-        for current_index, option in enumerate(options):
-            prefix = ">" if current_index == index else " "
-            color = typer.colors.GREEN if current_index == index else typer.colors.WHITE
-            typer.secho(f"{prefix} {option}", fg=color)
-
-        key = msvcrt.getwch()
-        if key in ("\x00", "\xe0"):
-            arrow = msvcrt.getwch()
-            if arrow == "H":
-                index = (index - 1) % len(options)
-            elif arrow == "P":
-                index = (index + 1) % len(options)
-        elif key == "\r":
+        _show_selection_screen(title, options, index)
+        index, did_submit, did_escape = _read_menu_key(index, len(options))
+        if did_submit:
             return options[index]
-        elif key == "\x1b":
+        if did_escape:
             return None
 
 
@@ -80,67 +99,75 @@ def _available_sound_files() -> list[str]:
     return sorted(path.name for path in sounds_dir.iterdir() if path.is_file())
 
 
-def _command_settings(command_name: str) -> None:
+def _save_state(update_message: str, apply_change) -> None:
     store = StateStore()
     state = store.load()
+    apply_change(state)
+    store.save(state)
+    typer.secho(update_message, fg=typer.colors.GREEN)
 
-    if command_name == "time":
-        selected_label = _select_from_menu(
-            "Select a template for the time command:",
-            [label for _, label in TIME_TEMPLATES],
-        )
-        if selected_label is None:
-            typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
-            return
 
-        template_lookup = {label: key for key, label in TIME_TEMPLATES}
-        state.time_template = template_lookup[selected_label]
-        store.save(state)
-        typer.secho(f"Time template updated to {selected_label}.", fg=typer.colors.GREEN)
+def _edit_time_settings() -> None:
+    labels = [label for _, label in TIME_TEMPLATES]
+    selected_label = _select_from_menu("Select a template for the time command:", labels)
+    if selected_label is None:
+        _show_cancelled_message()
+        return
+    template_lookup = {label: key for key, label in TIME_TEMPLATES}
+    _save_state(
+        f"Time template updated to {selected_label}.",
+        lambda state: setattr(state, "time_template", template_lookup[selected_label]),
+    )
+
+
+def _edit_joke_character() -> None:
+    selected_character = _select_from_menu("Select a character for the joke command:", JOKE_CHARACTERS)
+    if selected_character is None:
+        _show_cancelled_message()
+        return
+    _save_state(
+        f"Joke character updated to {selected_character}.",
+        lambda state: setattr(state, "joke_character", selected_character),
+    )
+
+
+def _edit_joke_sound() -> None:
+    sound_files = _available_sound_files()
+    if not sound_files:
+        typer.secho("No sound files were found in chronoterm/sounds.", fg=typer.colors.RED)
         return
 
-    if command_name == "joke":
-        selected_setting = _select_from_menu(
-            "Select a joke setting to edit:",
-            ["Character", "Sound"],
-        )
-        if selected_setting is None:
-            typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
-            return
-
-        if selected_setting == "Character":
-            selected_character = _select_from_menu(
-                "Select a character for the joke command:",
-                JOKE_CHARACTERS,
-            )
-            if selected_character is None:
-                typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
-                return
-
-            state.joke_character = selected_character
-            store.save(state)
-            typer.secho(f"Joke character updated to {selected_character}.", fg=typer.colors.GREEN)
-            return
-
-        sound_files = _available_sound_files()
-        if not sound_files:
-            typer.secho("No sound files were found in chronoterm/sounds.", fg=typer.colors.RED)
-            return
-
-        selected_sound = _select_from_menu(
-            "Select a sound for the joke command:",
-            sound_files,
-        )
-        if selected_sound is None:
-            typer.secho("Settings cancelled.", fg=typer.colors.YELLOW)
-            return
-
-        state.joke_sound = selected_sound
-        store.save(state)
-        typer.secho(f"Joke sound updated to {selected_sound}.", fg=typer.colors.GREEN)
+    selected_sound = _select_from_menu("Select a sound for the joke command:", sound_files)
+    if selected_sound is None:
+        _show_cancelled_message()
         return
+    _save_state(
+        f"Joke sound updated to {selected_sound}.",
+        lambda state: setattr(state, "joke_sound", selected_sound),
+    )
 
-    typer.secho(f"No editable settings are available yet for '{command_name}'.", fg=typer.colors.YELLOW)
+
+def _edit_joke_settings() -> None:
+    selected_setting = _select_from_menu("Select a joke setting to edit:", ["Character", "Sound"])
+    if selected_setting is None:
+        _show_cancelled_message()
+        return
+    if selected_setting == "Character":
+        _edit_joke_character()
+        return
+    _edit_joke_sound()
+
+
+def _command_settings(command_name: str) -> None:
+    handlers = {
+        "time": _edit_time_settings,
+        "joke": _edit_joke_settings,
+    }
+    handler = handlers.get(command_name)
+    if handler is None:
+        typer.secho(f"No editable settings are available yet for '{command_name}'.", fg=typer.colors.YELLOW)
+        return
+    handler()
 
 
 def launch_settings() -> None:

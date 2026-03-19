@@ -30,6 +30,17 @@ app = typer.Typer(help="ChronoTerm — Type 'shell' for interactive mode or use 
 console = Console()
 
 
+def _current_clock_parts() -> tuple[str, str]:
+    return tuple(datetime.now().strftime("%H:%M").split(":"))
+
+
+def _print_stopwatch_status(action: str) -> None:
+    console.print(f"Stopwatch: [bold]{chrono.sw.status()}[/bold] {chrono.sw.render()}")
+    if action == "show":
+        laps = chrono.sw.render_laps()
+        for idx, lap in enumerate(laps, start=1):
+            console.print(f"  Lap {idx}: {lap}")
+
 
 def _tz_table(tzs: list[str]) -> Table:
     table = Table(title="Favorite Time Zones")
@@ -77,7 +88,7 @@ def now():
 
 @app.command()
 def time():
-    hour, minutes = datetime.now().strftime("%H:%M").split(":")
+    hour, minutes = _current_clock_parts()
     template_name = chrono.store.load().time_template
     clockascii = clock_ascii(hour, minutes, template_name)
 
@@ -145,11 +156,7 @@ def sw(
         chrono.sw.lap()
         play_alarm()
     
-    console.print(f"Stopwatch: [bold]{chrono.sw.status()}[/bold] {chrono.sw.render()}")
-    if action == "show":
-        laps = chrono.sw.render_laps()
-        for idx, lap in enumerate(laps, start=1):
-            console.print(f"  Lap {idx}: {lap}")
+    _print_stopwatch_status(action)
 
 @app.command()
 def shell():
