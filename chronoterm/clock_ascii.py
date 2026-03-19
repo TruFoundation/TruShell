@@ -1,4 +1,4 @@
-def clock_ascii(hour, minutes, template_type):
+def clock_ascii(clock_text, template_type):
     
     if template_type == "wrist_watch":
         template1 = """
@@ -30,8 +30,7 @@ def clock_ascii(hour, minutes, template_type):
             |___|
 
         """
-        clock_ascii = template1.replace("HH", f"{hour}")
-        clock_ascii = clock_ascii.replace("MM", f"{minutes}")
+        clock_ascii = template1.replace("HH:MM", clock_text)
 
         return clock_ascii
 
@@ -46,8 +45,7 @@ def clock_ascii(hour, minutes, template_type):
             |_|___|___|___|___|_|
         """
 
-        clock_ascii = template2.replace("HH", f"{hour}")
-        clock_ascii = clock_ascii.replace("MM", f"{minutes}")
+        clock_ascii = template2.replace("HH:MM", clock_text)
 
         return clock_ascii
 
@@ -63,7 +61,6 @@ def clock_ascii(hour, minutes, template_type):
                 ____|___|____
                 |_____________|
         """
-        clock_ascii = template3.replace("HH", f"{hour}")
-        clock_ascii = clock_ascii.replace("MM", f"{minutes}")
+        clock_ascii = template3.replace("HH:MM", clock_text)
 
         return clock_ascii

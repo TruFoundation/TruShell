@@ -31,8 +31,16 @@ app = typer.Typer(help="ChronoTerm — Type 'shell' for interactive mode or use 
 console = Console()
 
 
-def _current_clock_parts() -> tuple[str, str]:
-    return tuple(datetime.now().strftime("%H:%M").split(":"))
+def _refresh_state() -> None:
+    chrono.state = chrono.store.load()
+    chrono.tz.state = chrono.state
+    chrono.alarms.state = chrono.state
+
+
+def _current_clock_display(clock_format: str) -> tuple[str, str | None]:
+    if clock_format == "12h":
+        return datetime.now().strftime("%I:%M"), datetime.now().strftime("%p")
+    return datetime.now().strftime("%H:%M"), None
 
 
 def _print_stopwatch_status(action: str) -> None:
@@ -43,6 +51,12 @@ def _print_stopwatch_status(action: str) -> None:
             console.print(f"  Lap {idx}: {lap}")
 
 
+def _is_local_timezone_name(name: str) -> bool:
+    local_now = datetime.now().astimezone()
+    zone_now = datetime.now(pytz.timezone(name))
+    return zone_now.utcoffset() == local_now.utcoffset() and zone_now.tzname() == local_now.tzname()
+
+
 def _tz_table(tzs: list[str]) -> Table:
     table = Table(title="Favorite Time Zones")
     table.add_column("IANA Name", style="bold cyan")
@@ -50,7 +64,10 @@ def _tz_table(tzs: list[str]) -> Table:
         table.add_row("(none)")
     else:
         for name in tzs:
-            table.add_row(name)
+            label = name
+            if _is_local_timezone_name(name):
+                label = f"[bold green]{name} (Local)[/bold green]"
+            table.add_row(label)
     return table
 
 # Persistent App State
@@ -85,19 +102,24 @@ chrono = ChronoTerm()
 
 @app.command()
 def now():
+    _refresh_state()
     console.print(chrono.tz.now_table())
 
 @app.command()
 def time():
-    hour, minutes = _current_clock_parts()
-    template_name = chrono.store.load().time_template
-    clockascii = clock_ascii(hour, minutes, template_name)
+    _refresh_state()
+    state = chrono.store.load()
+    clock_text, meridiem = _current_clock_display(state.clock_format)
+    clockascii = clock_ascii(clock_text, state.time_template)
 
     winsound.Beep(1000, 1000)
     console.print(clockascii)
+    if meridiem is not None:
+        console.print(f"[bold cyan]{meridiem}[/bold cyan]")
 
 @app.command()
 def world():
+    _refresh_state()
     console.print(chrono.tz.world_table())
 
 @app.command()
@@ -106,6 +128,7 @@ def tz(
     name: Optional[str] = typer.Argument(None, help="IANA Name (e.g. Europe/London)")
 ):
     """Manage favorite time zones."""
+    _refresh_state()
     if action == "list":
         console.print(_tz_table(chrono.tz.list()))
     elif action == "add" and name:
@@ -133,6 +156,7 @@ def alarm(
     label: Optional[str] = typer.Option(None, "--label", help="Alarm label")
 ):
     """Manage alarms."""
+    _refresh_state()
     if action == "list":
         console.print(chrono.alarms.alarms_table())
     elif action == "add" and time:

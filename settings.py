@@ -24,6 +24,11 @@ TIME_TEMPLATES = [
     ("desktop", "Desktop Clock"),
 ]
 
+CLOCK_FORMATS = [
+    ("24h", "24 Hour (Military)"),
+    ("12h", "12 Hour (AM/PM)"),
+]
+
 JOKE_CHARACTERS = [
     "cow",
     "trex",
@@ -105,15 +110,39 @@ def _save_state(update_message: str, apply_change) -> None:
 
 
 def _edit_time_settings() -> None:
-    labels = [label for _, label in TIME_TEMPLATES]
-    selected_label = _select_from_menu("Select a template for the time command:", labels)
+    selected_setting = _select_from_menu(
+        "Select a time setting to edit:",
+        ["Template", "Clock Format"],
+    )
+    if selected_setting is None:
+        _show_cancelled_message()
+        return
+    if selected_setting == "Template":
+        labels = [label for _, label in TIME_TEMPLATES]
+        selected_label = _select_from_menu("Select a template for the time command:", labels)
+        if selected_label is None:
+            _show_cancelled_message()
+            return
+        template_lookup = {label: key for key, label in TIME_TEMPLATES}
+        _save_state(
+            f"Time template updated to {selected_label}.",
+            lambda state: setattr(state, "time_template", template_lookup[selected_label]),
+        )
+        return
+
+    _edit_clock_format("time")
+
+
+def _edit_clock_format(command_name: str) -> None:
+    labels = [label for _, label in CLOCK_FORMATS]
+    selected_label = _select_from_menu(f"Select a clock format for the {command_name} command:", labels)
     if selected_label is None:
         _show_cancelled_message()
         return
-    template_lookup = {label: key for key, label in TIME_TEMPLATES}
+    format_lookup = {label: key for key, label in CLOCK_FORMATS}
     _save_state(
-        f"Time template updated to {selected_label}.",
-        lambda state: setattr(state, "time_template", template_lookup[selected_label]),
+        f"Clock format updated to {selected_label}.",
+        lambda state: setattr(state, "clock_format", format_lookup[selected_label]),
     )
 
 
@@ -158,6 +187,7 @@ def _edit_joke_settings() -> None:
 def _command_settings(command_name: str) -> None:
     handlers = {
         "time": _edit_time_settings,
+        "world": lambda: _edit_clock_format("world"),
         "joke": _edit_joke_settings,
     }
     handler = handlers.get(command_name)

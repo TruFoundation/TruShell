@@ -17,8 +17,21 @@ def _local_now() -> datetime:
     return datetime.now().astimezone()
 
 
-def format_dt(dt: datetime) -> str:
-    return dt.strftime("%H:%M")
+def _time_format_string(clock_format: str) -> str:
+    if clock_format == "12h":
+        return "%I:%M %p"
+    return "%H:%M"
+
+
+def format_dt(dt: datetime, clock_format: str) -> str:
+    return dt.strftime(_time_format_string(clock_format))
+
+
+def _is_local_timezone(now: datetime, zone_name: str) -> bool:
+    zone_now = now.astimezone(_safe_zoneinfo(zone_name))
+    local_tzname = now.tzname()
+    zone_tzname = zone_now.tzname()
+    return zone_now.utcoffset() == now.utcoffset() and zone_tzname == local_tzname
 
 
 def _safe_zoneinfo(name: str) -> ZoneInfo:
@@ -67,7 +80,7 @@ class TimezoneManager:
         table = Table(title="Current Time")
         table.add_column("Zone", style="bold")
         table.add_column("Time")
-        table.add_row(str(now.tzinfo) if now.tzinfo else "Local", format_dt(now))
+        table.add_row(str(now.tzinfo) if now.tzinfo else "Local", format_dt(now, self.state.clock_format))
         return table
 
     def world_table(self) -> Table:
@@ -75,9 +88,12 @@ class TimezoneManager:
         table = Table(title="World Time")
         table.add_column("Zone", style="bold")
         table.add_column("Time")
-        table.add_row(str(now.tzinfo) if now.tzinfo else "Local", format_dt(now))
+        table.add_row("[bold green]Local[/bold green]", format_dt(now, self.state.clock_format))
         for name in self.state.timezones:
             z = _safe_zoneinfo(name)
-            table.add_row(name, format_dt(now.astimezone(z)))
+            zone_label = name
+            if _is_local_timezone(now, name):
+                zone_label = f"[bold green]{name} (Local)[/bold green]"
+            table.add_row(zone_label, format_dt(now.astimezone(z), self.state.clock_format))
         return table
 

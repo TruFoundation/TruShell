@@ -31,6 +31,7 @@ class AppState:
     timezones: list[str] = field(default_factory=list)
     alarms: list[dict[str, Any]] = field(default_factory=list)
     time_template: str = "lcd"
+    clock_format: str = "24h"
     joke_character: str = "cow"
     joke_sound: str = "cow-sound.mp3"
     version: int = 1
@@ -52,6 +53,7 @@ class StateStore:
         tzs = data.get("timezones")
         alarms = data.get("alarms")
         time_template = data.get("time_template")
+        clock_format = data.get("clock_format")
         joke_character = data.get("joke_character")
         joke_sound = data.get("joke_sound")
         version = data.get("version")
@@ -63,6 +65,8 @@ class StateStore:
             state.alarms = alarms
         if isinstance(time_template, str):
             state.time_template = time_template
+        if isinstance(clock_format, str):
+            state.clock_format = clock_format
         if isinstance(joke_character, str):
             state.joke_character = joke_character
         if isinstance(joke_sound, str):
@@ -80,6 +84,7 @@ class StateStore:
             "timezones": state.timezones,
             "alarms": state.alarms,
             "time_template": state.time_template,
+            "clock_format": state.clock_format,
             "joke_character": state.joke_character,
             "joke_sound": state.joke_sound,
         }
