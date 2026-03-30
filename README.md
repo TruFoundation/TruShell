@@ -12,7 +12,7 @@ The `AtOffice shell` brings these tools together into one REPL so you can run co
 
 ### 1. AtOffice REPL
 
-The main combined shell is launched from `main.py`. Inside it, you can:
+The main combined shell is launched from `project.py`. Inside it, you can:
 
 - tell jokes
 - manage todos
@@ -84,7 +84,7 @@ ChronoTerm settings currently support:
 From the project root:
 
 ```bash
-python main.py
+python project.py
 ```
 
 This starts the shared shell where all supported commands can be used.
@@ -94,7 +94,7 @@ This starts the shared shell where all supported commands can be used.
 From the project root:
 
 ```bash
-python project.py
+python chronoterm_project.py
 ```
 
 This starts the dedicated ChronoTerm shell.
@@ -127,9 +127,9 @@ Settings are saved to a JSON state file through ChronoTerm state storage, so cho
 
 ### Root files
 
-- [main.py](main.py)
-  Combined AtOffice REPL
 - [project.py](project.py)
+  Combined AtOffice REPL
+- [chronoterm_project.py](chronoterm_project.py)
   Root entry point for ChronoTerm shell
 - [pyfunny.py](pyfunny.py)
   Joke commands
