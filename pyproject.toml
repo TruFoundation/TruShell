@@ -1,0 +1,26 @@
+[project]
+name = "at-office-shell"
+version = "0.1.0"
+description = "A productivity terminal shell with jokes, todos, and ChronoTerm"
+readme = "README.md"
+requires-python = ">=3.10"
+
+authors = [
+    { name = "Akshaj Singhal" }
+]
+
+dependencies = [
+    "typer",
+    "rich",
+    "pyjokes",
+    "cowsay",
+    "playsound",
+    "pytz"
+]
+
+[project.scripts]
+atoffice-shell = "project:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
