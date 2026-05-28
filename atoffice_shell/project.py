@@ -99,7 +99,7 @@ def _handle_joke_command(command: str) -> bool:
 def _handle_todo_command(command: str) -> bool:
     delete_match = re.match(r"deletetask\s+(\d+)", command)
     if delete_match:
-        delete_todo(int(delete_match.group(1)))
+        delete_todo(int(delete_match.group(1)) - 1)
         return True
 
     add_match = re.match(r'addtask\s+"([^"]+)"\s+"([^"]+)"', command)
@@ -114,7 +114,7 @@ def _handle_todo_command(command: str) -> bool:
 
     complete_match = re.match(r'completetask\s+(\d+)', command)
     if complete_match:
-        complete_todo(int(complete_match.group(1)))
+        complete_todo(int(complete_match.group(1)) - 1)
         return True
 
     if command == "showtasks":
