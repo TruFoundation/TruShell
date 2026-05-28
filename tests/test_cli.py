@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from atoffice_shell.cli import app
-from atoffice_shell.project import _handle_cd_command, _handle_local_command, _handle_os_fallback
+from atoffice_shell.project import _handle_cd_command, _handle_edit_command, _handle_local_command, _handle_os_fallback
 
 
 runner = CliRunner()
@@ -86,4 +86,35 @@ def test_addtask_missing_arguments_is_blocked(monkeypatch) -> None:
     )
 
     assert _handle_local_command("addtask", "") == "handled"
-    assert messages and "Missing arguments" in messages[0][0]
+
+
+def test_edit_requires_filename(monkeypatch) -> None:
+    messages = []
+
+    monkeypatch.setattr(
+        "atoffice_shell.project.typer.secho",
+        lambda message, fg=None: messages.append((message, fg)),
+    )
+
+    assert _handle_edit_command("edit") is True
+    assert messages and "Syntax: edit <filename>" in messages[0][0]
+
+
+def test_edit_launches_editor_for_existing_file(monkeypatch, tmp_path) -> None:
+    file_path = tmp_path / "note.txt"
+    file_path.write_text("hello", encoding="utf-8")
+
+    calls = {}
+
+    class FakeEditor:
+        def __init__(self, filename: str, initial_text: str) -> None:
+            calls["filename"] = filename
+            calls["initial_text"] = initial_text
+
+        def run(self) -> None:
+            calls["ran"] = True
+
+    monkeypatch.setattr("atoffice_shell.project.AtonEditor", FakeEditor)
+
+    assert _handle_edit_command(f"edit {file_path}") is True
+    assert calls == {"filename": str(file_path), "initial_text": "hello", "ran": True}

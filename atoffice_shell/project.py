@@ -4,8 +4,12 @@ import os
 import re
 import shlex
 import subprocess
+from pathlib import Path
 
 import typer
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.widgets import Footer, Header, TextArea
 
 from .pyfunny import joke, joke_trex
 from .settings import launch_settings
@@ -32,6 +36,56 @@ def _prompt_command() -> tuple[str, str, str]:
     raw_command = typer.prompt("atoffice-shell").strip()
     command, argument = _split_command(raw_command)
     return raw_command, command, argument
+
+
+class AtonEditor(App):
+    """Simple full-screen text editor for ATON shell files."""
+
+    inherit_bindings = True
+
+    CSS = """
+    Screen { padding: 0; }
+    #editor { height: 1fr; }
+    Footer { height: 1; }
+    """
+
+    BINDINGS = [
+        ("ctrl+shift+s", "save_file", "Ctrl+Shift+S Save"),
+        ("ctrl+shift+q", "quit_app", "Ctrl+Shift+Q Quit"),
+    ]
+
+    def __init__(self, file_path: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.file_path = file_path
+        self.file_content = ""
+
+        import os
+
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as handle:
+                    self.file_content = handle.read()
+            except Exception as error:
+                self.file_content = f"Error reading file: {error}"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield TextArea(self.file_content, id="editor_text_area")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.text_area.focus()
+
+    def action_save_file(self) -> None:
+        text_area = self.query_one("#editor_text_area", TextArea)
+        try:
+            with open(self.file_path, "w", encoding="utf-8") as handle:
+                handle.write(text_area.text)
+        except Exception:
+            pass
+
+    def action_quit_app(self) -> None:
+        self.exit()
 
 
 def _handle_joke_command(command: str) -> bool:
@@ -70,6 +124,26 @@ def _handle_todo_command(command: str) -> bool:
         return True
 
     return False
+
+
+def _handle_edit_command(raw_command: str) -> bool:
+    command, argument = _split_command(raw_command)
+    if command != "edit":
+        return False
+
+    if not argument.strip():
+        typer.secho("⚠️ Syntax: edit <filename>", fg=typer.colors.YELLOW)
+        return True
+
+    file_path = Path(argument.strip())
+    initial_text = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
+
+    try:
+        AtonEditor(str(file_path), initial_text).run()
+    except Exception as error:
+        typer.secho(f"Editor error: {error}", fg=typer.colors.RED)
+
+    return True
 
 
 def _handle_local_command(command: str, argument: str) -> str:
@@ -166,6 +240,8 @@ def run_interactive_shell() -> None:
         if _handle_chronoterm_command(raw_command, command):
             continue
         if _handle_cd_command(raw_command):
+            continue
+        if _handle_edit_command(raw_command):
             continue
         if _handle_os_fallback(raw_command):
             continue

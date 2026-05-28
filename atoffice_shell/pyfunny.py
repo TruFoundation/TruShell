@@ -12,6 +12,8 @@ from .chronoterm.state import StateStore
 DEFAULT_JOKE_CHARACTER = "cow"
 DEFAULT_JOKE_SOUND = "cow-sound.mp3"
 
+# Hi! This commit was made through the `edit` command!
+# This one too!
 
 def _sound_path(filename: str) -> Path:
     return Path(__file__).resolve().parent / "chronoterm" / "sounds" / filename
