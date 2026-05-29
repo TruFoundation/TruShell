@@ -179,7 +179,7 @@ atoffice_shell/
 
 ### Setup
 ```bash
-git clone https://github.com/AkshajSinghal/at-office-shell.git
+git clone https://github.com/AkshajSinghal/trushell.git
 cd at-office-shell
 poetry install
 # or
@@ -201,7 +201,7 @@ twine upload dist/*
 
 Contributions are welcome! Please:
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-2. Check existing [issues](https://github.com/AkshajSinghal/at-office-shell/issues)
+2. Check existing [issues](https://github.com/AkshajSinghal/trushell/issues)
 3. Fork and create a pull request
 
 See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.
@@ -229,10 +229,7 @@ Apache 2.0 - See [LICENSE](LICENSE) for details.
 
 ## 🌟 Star this repo if TruShell boosts your productivity!
 
-[![GitHub stars](https://img.shields.io/github/stars/AkshajSinghal/at-office-shell?style=social)](https://github.com/AkshajSinghal/at-office-shell)
-[![PyPI version](https://img.shields.io/pypi/v/trushell)](https://pypi.org/project/trushell/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-
+[![GitHub stars](https://img.shields.io/github/stars/AkshajSinghal/trushell?style=social)](https://github.com/AkshajSinghal/at-office-shell)
 ---
 
 **Made with ❤️ for Linux users who value productivity and fun.**
