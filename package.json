@@ -1,8 +1,9 @@
 {
-  "name": "trushell",
+  "name": "@truos/trushell",
   "version": "1.0.0",
   "description": "TruShell - A modern terminal-based operating workspace interface",
   "main": "index.js",
+  "type": "commonjs",
   "directories": {
     "test": "tests"
   },
@@ -14,16 +15,28 @@
     "trushell": "./bin/index.js",
     "TruOS": "./bin/index.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "index.js",
+    "requirements.txt",
+    "README.md"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AkshajSinghal/trushell.git"
+    "url": "https://github.com/AkshajSinghal/TruShell"
   },
-  "keywords": [],
+  "keywords": [
+    "shell",
+    "terminal",
+    "workspace",
+    "tui",
+    "truos"
+  ],
   "author": "Akshaj Singhal",
-  "license": "MIT",
-  "type": "commonjs",
+  "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/AkshajSinghal/trushell/issues"
+    "url": "https://github.com/AkshajSinghal/TruShell/issues"
   },
-  "homepage": "https://github.com/AkshajSinghal/trushell#readme"
+  "homepage": "https://github.com/AkshajSinghal/TruShell#readme"
 }
