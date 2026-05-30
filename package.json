@@ -12,9 +12,9 @@
     "postinstall": "pip install typer rich pyjokes cowsay pytz platformdirs textual || pip3 install typer rich pyjokes cowsay pytz platformdirs textual"
   },
   "bin": {
-    "truos": "./index.js",
-    "trushell": "./index.js",
-    "atoffice-shell": "./index.js",
+    "truos": "./bin/index.js",
+    "trushell": "./bin/index.js",
+    "atoffice-shell": "./bin/index.js",
     "TruOS": "./bin/index.js"
   },
   "files": [
