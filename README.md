@@ -1,4 +1,4 @@
-# 🐧 TruShell
+# 🐄 TruShell
 
 > **A modern, Linux-native productivity shell that integrates seamlessly with your workflow**
 
@@ -17,10 +17,9 @@ TruShell is not just another terminal—it's a **productivity powerhouse** that 
 ## Installation
 
 ### Using pip (Recommended)
-Note: coming soon
-
-### Using uv (Faster)
-Note: coming soon
+```
+pip install trushell
+```
 
 ### From Source
 ```bash
