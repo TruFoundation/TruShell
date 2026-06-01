@@ -29,27 +29,56 @@ HELP_TEXT = (
 )
 
 
-def _split_command(user_input: str) -> tuple[str, str]:
-    parts = user_input.strip().split(maxsplit=1)
+def _split_command(user_input: str) -> tuple[str, list[str]]:
+    stripped = user_input.strip()
+    if not stripped:
+        return "", []
+
+    try:
+        parts = shlex.split(stripped)
+    except ValueError:
+        return "", []
+
     if not parts:
-        return "", ""
+        return "", []
+
     command = parts[0].lower()
-    argument = parts[1] if len(parts) > 1 else ""
-    return command, argument
+    arguments = parts[1:]
+    return command, arguments
 
 
-def _prompt_command() -> tuple[str, str, str]:
-    raw_command = input("trushell ❯ ").strip()
-    command, argument = _split_command(raw_command)
-    return raw_command, command, argument
+def _prompt_command() -> tuple[str, str, list[str]]:
+    raw_input = input("trushell ❯ ")
+    if "\n" in raw_input:
+        typer.secho(
+            "⚠️ Please enter commands one at a time.",
+            fg=typer.colors.YELLOW,
+        )
+        return "", "", []
+
+    command, arguments = _split_command(raw_input)
+    if not command:
+        if raw_input.strip():
+            typer.secho(
+                "⚠️ Invalid syntax: Check your quotes and escapes.",
+                fg=typer.colors.YELLOW,
+            )
+        return "", "", []
+
+    return raw_input, command, arguments
 
 
 def _run_external_command(
-    command: str,
+    command: str | list[str],
     shell: bool = True,
     check: bool = False,
     cwd: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    """Run an external command and optionally profile resource usage.
+
+    When shell=False, the command must be provided as a list of arguments so it is
+    executed directly without shell interpretation.
+    """
     if psutil is None:
         return subprocess.run(command, shell=shell, check=check, cwd=cwd)
 
@@ -152,44 +181,39 @@ def _handle_joke_command(command: str) -> bool:
     return False
 
 
-def _handle_todo_command(command: str) -> bool:
-    delete_match = re.match(r"deletetask\s+(\d+)", command)
-    if delete_match:
-        delete_todo(int(delete_match.group(1)) - 1)
+def _handle_todo_command(command: str, arguments: list[str]) -> bool:
+    if command == "deletetask" and len(arguments) == 1 and arguments[0].isdigit():
+        delete_todo(int(arguments[0]) - 1)
         return True
 
-    add_match = re.match(r'addtask\s+"([^"]+)"\s+"([^"]+)"', command)
-    if add_match:
-        addtask(add_match.group(1), add_match.group(2))
+    if command == "addtask" and len(arguments) == 2:
+        addtask(arguments[0], arguments[1])
         return True
 
-    update_match = re.match(r'updatetask\s+(\d+)\s+"([^"]+)"\s+"([^"]+)"', command)
-    if update_match:
-        update_todo(int(update_match.group(1)), update_match.group(2), update_match.group(3))
+    if command == "updatetask" and len(arguments) == 3 and arguments[0].isdigit():
+        update_todo(int(arguments[0]), arguments[1], arguments[2])
         return True
 
-    complete_match = re.match(r'completetask\s+(\d+)', command)
-    if complete_match:
-        complete_todo(int(complete_match.group(1)) - 1)
+    if command == "completetask" and len(arguments) == 1 and arguments[0].isdigit():
+        complete_todo(int(arguments[0]) - 1)
         return True
 
-    if command == "showtasks":
+    if command == "showtasks" and not arguments:
         showtask()
         return True
 
     return False
 
 
-def _handle_edit_command(raw_command: str) -> bool:
-    command, argument = _split_command(raw_command)
+def _handle_edit_command(command: str, arguments: list[str]) -> bool:
     if command != "edit":
         return False
 
-    if not argument.strip():
+    if not arguments:
         typer.secho("⚠️ Syntax: edit <filename>", fg=typer.colors.YELLOW)
         return True
 
-    file_path = Path(argument.strip())
+    file_path = Path(arguments[0])
     initial_text = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
 
     try:
@@ -200,8 +224,8 @@ def _handle_edit_command(raw_command: str) -> bool:
     return True
 
 
-def _handle_local_command(command: str, argument: str) -> str:
-    if command == "addtask" and not argument:
+def _handle_local_command(command: str, arguments: list[str]) -> str:
+    if command == "addtask" and len(arguments) < 2:
         typer.secho(
             '⚠️ Missing arguments. Syntax: addtask "task-name" "category"',
             fg=typer.colors.YELLOW,
@@ -212,7 +236,7 @@ def _handle_local_command(command: str, argument: str) -> str:
         return "exit"
     if _handle_joke_command(command):
         return "handled"
-    if _handle_todo_command(command):
+    if _handle_todo_command(command, arguments):
         return "handled"
     if command == "settings":
         launch_settings()
@@ -234,21 +258,20 @@ def _handle_chronoterm_command(raw_command: str, normalized_command: str) -> boo
     return True
 
 
-def _handle_cd_command(raw_command: str) -> bool:
+def _handle_cd_command(command: str, arguments: list[str]) -> bool:
     """Handle cd natively so the shell's working directory changes permanently."""
-    command, argument = _split_command(raw_command)
     if command != "cd":
         return False
 
-    if not argument.strip():
+    if not arguments:
         typer.secho("Syntax: cd <directory_path>", fg=typer.colors.YELLOW)
         return True
 
-    target = os.path.expanduser(argument)
+    target = os.path.expanduser(arguments[0])
 
     try:
         os.chdir(target)
-        _run_external_command("ls", shell=True, check=False, cwd=os.getcwd())
+        _run_external_command(["ls"], shell=False, check=False, cwd=os.getcwd())
     except (FileNotFoundError, NotADirectoryError, PermissionError) as error:
         typer.secho(f"❌ Cannot navigate: {error}", fg=typer.colors.RED)
     except OSError as error:
@@ -257,22 +280,96 @@ def _handle_cd_command(raw_command: str) -> bool:
     return True
 
 
+def is_dangerous_command(command: str) -> bool:
+    """Detect unsafe shell operators or expansions in user input.
+
+    Quotes, spaces, and escaped quote sequences are allowed, but shell
+    metacharacters are blocked before external execution.
+    """
+    if not command.strip():
+        return False
+
+    try:
+        shlex.split(command)
+    except ValueError:
+        return True
+
+    dangerous_pattern = re.compile(r"\|\||&&|>>|[|<>;`$&{}()]")
+    return bool(dangerous_pattern.search(command))
+
+
 def _handle_os_fallback(raw_command: str) -> bool:
-    """Pass unrecognized commands to the host OS shell."""
+    """Pass unrecognized commands to the host OS safely using shell=False."""
     command = raw_command.strip()
     if not command:
         return False
 
+    if is_dangerous_command(command):
+        typer.secho(
+            "⚠️ TruShell blocks shell operators and expansions for safety.",
+            fg=typer.colors.YELLOW,
+        )
+        typer.secho(
+            "Use simple external commands without |, >, <, ;, &&, ||, $, `, or $().",
+            fg=typer.colors.YELLOW,
+        )
+        return True
+
     try:
-        completed = _run_external_command(command, shell=True, check=False, cwd=os.getcwd())
+        parsed_command = shlex.split(command)
+    except ValueError:
+        typer.secho(
+            "❌ Could not parse command. Check your quoting and try again.",
+            fg=typer.colors.RED,
+        )
+        return True
+
+    if not parsed_command:
+        return False
+
+    try:
+        completed = _run_external_command(parsed_command, shell=False, check=False, cwd=os.getcwd())
     except (OSError, subprocess.SubprocessError) as error:
         typer.secho("❓ Command not recognized by TruShell or your host OS.", fg=typer.colors.YELLOW)
         typer.secho(f"OS fallback error: {error}", fg=typer.colors.RED)
         return True
 
     if completed.returncode != 0:
-        typer.secho("❓ Command not recognized by TruShell or your host OS.", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"⚠️ External command exited with status {completed.returncode}.",
+            fg=typer.colors.YELLOW,
+        )
     return True
+
+
+def parse_and_execute_command(raw_command: str) -> bool:
+    """Parse a command and execute TruShell built-ins or safe external commands."""
+    stripped = raw_command.strip()
+    if not stripped:
+        return True
+
+    command, arguments = _split_command(stripped)
+    if not command:
+        typer.secho(
+            "⚠️ Invalid syntax: Check your quotes and escapes.",
+            fg=typer.colors.YELLOW,
+        )
+        return True
+
+    local_result = _handle_local_command(command, arguments)
+    if local_result == "exit":
+        return False
+    if local_result == "handled":
+        return True
+
+    if _handle_chronoterm_command(stripped, command):
+        return True
+    if _handle_cd_command(command, arguments):
+        return True
+    if _handle_edit_command(command, arguments):
+        return True
+
+    return _handle_os_fallback(stripped)
 
 
 def run_interactive_shell() -> None:
@@ -281,23 +378,13 @@ def run_interactive_shell() -> None:
 
     while True:
         try:
-            raw_command, command, argument = _prompt_command()
+            raw_command, command, arguments = _prompt_command()
         except (KeyboardInterrupt, EOFError):
             typer.echo("")
             break
 
-        local_result = _handle_local_command(command, argument)
-        if local_result == "exit":
-            break
-        if local_result == "handled":
-            continue
-        if _handle_chronoterm_command(raw_command, command):
-            continue
-        if _handle_cd_command(raw_command):
-            continue
-        if _handle_edit_command(raw_command):
-            continue
-        if _handle_os_fallback(raw_command):
+        if not command:
             continue
 
-        typer.secho(f"Unknown command: {command}", fg=typer.colors.RED)
+        if not parse_and_execute_command(raw_command):
+            break
