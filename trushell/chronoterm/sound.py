@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 
 
+class AudioPlaybackUnavailable(RuntimeError):
+    """Raised when the host has no supported way to play a selected asset."""
+
+
 def _run_quietly(cmd: list[str]) -> bool:
     result = subprocess.run(
         cmd,
@@ -37,7 +41,7 @@ def play_audio_file(path: str | Path) -> bool:
     if sys.platform.startswith("win"):
         playable_path = _resolve_windows_sound_path(sound_path)
         if playable_path is None:
-            raise RuntimeError(
+            raise AudioPlaybackUnavailable(
                 f"Windows playback requires a .wav fallback for {sound_path.name}"
             )
 
@@ -48,7 +52,7 @@ def play_audio_file(path: str | Path) -> bool:
 
     if sys.platform == "darwin":
         if not shutil.which("afplay"):
-            raise RuntimeError("afplay is unavailable")
+            raise AudioPlaybackUnavailable("afplay is unavailable")
         return _run_quietly(["afplay", str(sound_path)])
 
     attempted_player = False
@@ -67,7 +71,9 @@ def play_audio_file(path: str | Path) -> bool:
     if attempted_player:
         return False
 
-    raise RuntimeError(f"No supported Linux audio player could play {sound_path}")
+    raise AudioPlaybackUnavailable(
+        f"No supported Linux audio player could play {sound_path}"
+    )
 
 
 def play_alarm() -> None:

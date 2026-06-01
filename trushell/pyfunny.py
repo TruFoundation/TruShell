@@ -7,7 +7,11 @@ import pyjokes
 import typer
 
 from .chronoterm.state import StateStore
-from .chronoterm.sound import play_alarm, play_audio_file
+from .chronoterm.sound import (
+    AudioPlaybackUnavailable,
+    play_alarm,
+    play_audio_file,
+)
 
 DEFAULT_JOKE_CHARACTER = "cow"
 DEFAULT_JOKE_SOUND = "cow-sound.mp3"
@@ -26,7 +30,7 @@ def _play_sound(filename: str) -> None:
 
     try:
         played_selected_sound = play_audio_file(sound_path)
-    except Exception:
+    except AudioPlaybackUnavailable:
         typer.secho(
             "Unable to play selected sound. Falling back to alarm.",
             fg=typer.colors.YELLOW,
@@ -38,6 +42,13 @@ def _play_sound(filename: str) -> None:
                 "Unable to play sound. Continuing without audio.",
                 fg=typer.colors.YELLOW,
             )
+        return
+    except Exception:
+        typer.secho(
+            "Selected sound playback failed unexpectedly. "
+            "Skipping fallback to avoid overlapping audio.",
+            fg=typer.colors.YELLOW,
+        )
         return
 
     if not played_selected_sound:

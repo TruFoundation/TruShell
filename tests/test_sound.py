@@ -49,9 +49,7 @@ def test_play_sound_uses_requested_sound_file(monkeypatch, tmp_path):
     assert calls == [sound_file]
 
 
-def test_play_sound_falls_back_when_custom_player_unavailable(
-    monkeypatch, tmp_path
-):
+def test_play_sound_falls_back_when_custom_player_unavailable(monkeypatch, tmp_path):
     sound_file = tmp_path / "custom-sound.mp3"
     sound_file.write_text("not real audio")
     alarm_calls = []
@@ -60,7 +58,9 @@ def test_play_sound_falls_back_when_custom_player_unavailable(
     monkeypatch.setattr(
         pyfunny,
         "play_audio_file",
-        lambda path: (_ for _ in ()).throw(RuntimeError("no supported player")),
+        lambda path: (_ for _ in ()).throw(
+            sound.AudioPlaybackUnavailable("no supported player")
+        ),
     )
     monkeypatch.setattr(pyfunny, "play_alarm", lambda: alarm_calls.append("alarm"))
 
@@ -76,6 +76,26 @@ def test_play_sound_skips_alarm_after_custom_playback_attempt(monkeypatch, tmp_p
 
     monkeypatch.setattr(pyfunny, "_sound_path", lambda filename: sound_file)
     monkeypatch.setattr(pyfunny, "play_audio_file", lambda path: False)
+    monkeypatch.setattr(pyfunny, "play_alarm", lambda: alarm_calls.append("alarm"))
+
+    pyfunny._play_sound("custom-sound.mp3")
+
+    assert alarm_calls == []
+
+
+def test_play_sound_skips_alarm_after_unexpected_playback_exception(
+    monkeypatch, tmp_path
+):
+    sound_file = tmp_path / "custom-sound.mp3"
+    sound_file.write_text("not real audio")
+    alarm_calls = []
+
+    monkeypatch.setattr(pyfunny, "_sound_path", lambda filename: sound_file)
+
+    def fake_play_file(path):
+        raise RuntimeError("player failed after starting playback")
+
+    monkeypatch.setattr(pyfunny, "play_audio_file", fake_play_file)
     monkeypatch.setattr(pyfunny, "play_alarm", lambda: alarm_calls.append("alarm"))
 
     pyfunny._play_sound("custom-sound.mp3")
