@@ -1,158 +1,139 @@
-# 🐄 TruShell
+🐄 TruShell - a lightweight, context‑aware shell for developers
+===========================================================
 
-TruShell is a small productivity shell for people who want task tracking and time
-tools next to ordinary terminal commands. It is not meant to replace bash, zsh,
-fish, or PowerShell; it sits beside them and handles the lightweight workflow
-bits that are easy to forget during a coding session.
+TruShell is not a full replacement for bash or zsh. It is a small
+utility shell that sits next to your normal terminal and helps you
+track tasks, check times, set alarms, and run ordinary commands.
 
-## What It Does
+It is written in Python and uses a SQLite database for todos.
+When you type a command TruShell does not recognise, it passes it
+directly to the host system’s shell (bash, cmd, etc.).
 
-- Keeps todos in SQLite with stable display positions.
-- Shows local time, world clocks, alarms, and a stopwatch through ChronoTerm.
-- Falls back to host operating-system commands when a command is not handled by
-  TruShell.
-- Opens a Textual editor for quick file edits from the REPL.
-- Supports short joke breaks with configurable cowsay characters and optional
-  local sound files.
 
-## Install
+What makes TruShell useful
+--------------------------
 
-```bash
-pip install trushell
+  *  Built‑in todo manager with stable task numbers
+     – add, delete, update, complete, show
+     – categories and done/open status stored in SQLite
+
+  *  Time tools without leaving your terminal
+     – ‘now’ shows local time
+     – ‘world’ lists your saved time zones
+     – ‘alarm’ schedules one‑shot reminders
+     – ‘sw’ controls a stopwatch (start, pause, lap, reset)
+
+  *  Jokes, because work needs breaks
+     – ‘joke’ shows a random joke with cowsay‑style art
+     – ‘joke_trex’ for a T‑Rex joke, with optional sound
+     – you can change the character via settings
+
+  *  Built‑in full‑screen editor (Textual)
+     – ‘edit <filename>’ opens a quick editor inside the REPL
+
+  *  Safe external command execution
+     – piped / chained commands are blocked
+     – external commands run without a shell when possible
+     – optional CPU/memory monitoring if psutil is present
+
+
+Quick start
+-----------
+
+Install from PyPI:
+
+    `pip install trushell`
+
+Then run:
+
+    `trushell`
+
+Inside TruShell, type ‘help’ for a list of commands.
+Type ‘exit’ or Ctrl‑D to quit.
+
+To run from source:
+```
+    git clone https://github.com/AkshajSinghal/trushell
+    cd trushell
+    pip install -e .
+    PYTHONPATH=. python -m trushell
 ```
 
-For local development:
+Core commands (most useful)
+----------------------------
 
-```bash
-git clone https://github.com/AkshajSinghal/trushell.git
-cd trushell
-pip install -e ".[dev]"
-```
+Todo management:
+    `addtask "task description" "Category"`
+    `deletetask <number>`
+    `updatetask <number> "new desc" "new category"`
+    `completetask <number>`
+    `showtasks`
 
-After installation, the `trushell` console script is added to your shell `PATH` and can be run directly.
+Time & alarms:
+    now
+    time                     – shows an ASCII clock
+    world
+    tz list | add <zone> | remove <id>
+    alarm list | add HH:MM --label "name" | remove <id>
+    sw start | pause | lap | reset | show
 
-If you are working from the source tree without installing, run:
+Other:
+    edit <filename>
+    cd <dir>
+    settings                 – change preferences interactively
+    joke
+    joke_trex
 
-```bash
-PYTHONPATH=. python -m trushell
-```
 
-## Quick Start
+Configuration
+-------------
 
-```bash
-$ trushell
-Entering TruShell. Type 'exit' to quit.
-trushell> help
-Available commands: joke, joke_trex, addtask, deletetask, updatetask, completetask, showtask, now, time, world, tz, alarm, sw, settings, exit, help
+Run the ‘settings’ command inside TruShell. You can change:
 
-trushell> addtask "Review PR" "Work"
-Task added.
+  *  clock style (LCD, wrist watch, desktop clock)
+  *  12h / 24h format
+  *  cowsay character for jokes (cow, trex, dragon, tux, kitty, …)
+  *  joke sound (choose from available .mp3 or .wav files)
 
-trushell> showtasks
-Todos
- #    Todo                 Category      Done
- 1    Review PR            Work          open
+Settings are saved automatically.
 
-trushell> time
-             ___________________
-            |  _______________  |
-            | |     14:30     | |
-            | |_______________| |
-            |  ___ ___ ___ ___  |
-            |_|___|___|___|___|_|
 
-trushell> ls
-```
+Where data lives
+----------------
 
-## Commands
+Todos and application preferences are stored in SQLite. The database
+file is placed in the platform’s standard user data directory:
 
-### Todo
+  *  Linux:   ~/.local/share/trushell/
+  *  macOS:   ~/Library/Application Support/trushell/
+  *  Windows: %APPDATA%\trushell\
 
-| Command | Description |
-| --- | --- |
-| `addtask "<task>" "<category>"` | Add a new todo. |
-| `deletetask <position>` | Delete by the number shown in `showtasks`. |
-| `updatetask <position> "<task>" "<category>"` | Update task text and category. |
-| `completetask <position>` | Mark a task as done. |
-| `showtasks` | Print the current todo list. |
+Old JSON state files (from earlier versions) are automatically
+renamed to .bak and migrated into SQLite on first run.
 
-### Time
 
-| Command | Description |
-| --- | --- |
-| `now` | Show current local time. |
-| `time` | Show the configured ASCII clock. |
-| `world` | Show saved time zones. |
-| `tz list` | List saved time zones. |
-| `tz add <IANA>` | Add a time zone such as `Europe/London`. |
-| `tz remove <IANA>` | Remove a saved time zone. |
-| `alarm list` | List alarms. |
-| `alarm add "<HH:MM>" --label "Name"` | Add an alarm. |
-| `alarm remove <id>` | Remove an alarm by ID. |
-| `sw start`, `sw pause`, `sw lap`, `sw reset`, `sw show` | Stopwatch controls. |
+Security notes
+--------------
 
-### Shell And Settings
+TruShell blocks commands that contain ‘|’, ‘>’, ‘&&’, or ‘||’ to prevent
+accidental chaining inside the REPL. External commands are executed
+using Python’s subprocess without a shell when possible.
 
-| Command | Description |
-| --- | --- |
-| `settings` | Change persisted preferences. |
-| `edit <file>` | Open the built-in Textual editor. |
-| `cd <dir>` | Change TruShell's current directory. |
-| `help` | Print command help. |
-| `exit` or `quit` | Leave the REPL. |
+If you want to use shell operators, exit TruShell and run the command
+in your normal shell.
 
-Unrecognized commands are executed directly through the host OS without shell
-operator expansion. Commands containing pipes, redirects, or chained operators
-are rejected for now because they need a proper parser before they can be passed
-through safely.
 
-## Storage
+Development
+-----------
 
-Todos and application preferences are stored in SQLite under the platform's user
-data directory. Older JSON state files are migrated into SQLite on first load and
-renamed to a `.bak` file so the original settings are not silently discarded.
+Tests:    pytest tests/
+Version:  kept in sync between trushell/__init__.py and pyproject.toml
 
-## Architecture Notes
+To add a custom sound for jokes, put an .mp3 or .wav file into
+trushell/chronoterm/sounds/ – it will appear in the ‘settings’ menu.
 
-TruShell uses a few terminal libraries, each for a narrow job:
 
-- Typer owns command parsing and CLI entry points.
-- Rich owns formatted terminal output such as tables and styled status text.
-- Textual is used only for the full-screen editor, where a widget toolkit is
-  more appropriate than line-by-line terminal output.
+License
+-------
 
-The main modules are:
-
-```text
-trushell/
-  cli.py                 direct CLI commands
-  project.py             interactive REPL and host-command fallback
-  todocli.py             todo commands
-  database.py            SQLite connection and persistence helpers
-  settings.py            prompt-based preference editor
-  pyfunny.py             jokes, cowsay rendering, and sound selection
-  chronoterm/
-    shell.py             time-related commands
-    state.py             SQLite-backed app state with JSON migration
-    alarms.py            alarm scheduling
-    timezones.py         world clock helpers
-    stopwatch.py         stopwatch state
-    sound.py             platform-specific audio fallback
-```
-
-## Development
-
-```bash
-pip install -e ".[dev]"
-pytest tests/
-```
-
-The package metadata is in `pyproject.toml`; the runtime version exported by
-`trushell.__version__` should be kept in sync with it.
-
-For custom joke sounds, prefer `.mp3` and `.wav` assets for the broadest
-cross-platform playback support across the available audio backends.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE) for details.
+Apache 2.0 – see LICENSE file in the repository.
