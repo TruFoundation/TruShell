@@ -54,7 +54,7 @@ def insert_todo(todo: Todo) -> None:
 
 def get_all_todos() -> List[Todo]:
     with get_db_connection() as conn:
-        results = conn.execute("SELECT * FROM todos").fetchall()
+        results = conn.execute("SELECT * FROM todos ORDER BY position").fetchall()
     return [Todo(*result) for result in results]
 
 
