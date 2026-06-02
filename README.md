@@ -142,6 +142,9 @@ pytest tests/
 The package metadata is in `pyproject.toml`; the runtime version exported by
 `trushell.__version__` should be kept in sync with it.
 
+For custom joke sounds, prefer `.mp3` and `.wav` assets for the broadest
+cross-platform playback support across the available audio backends.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) for details.

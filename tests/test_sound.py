@@ -48,15 +48,27 @@ def test_play_sound_uses_requested_sound_file(monkeypatch, tmp_path):
 
     assert calls == [sound_file]
 
-
-def test_play_audio_file_passes_string_path_to_linux_player(monkeypatch, tmp_path):
+def test_play_audio_file_uses_string_path_for_linux_players(monkeypatch, tmp_path):
     sound_file = tmp_path / "custom-sound.mp3"
     sound_file.write_text("not real audio")
     calls = []
 
     monkeypatch.setattr(sound.sys, "platform", "linux")
-    monkeypatch.setattr(sound.shutil, "which", lambda name: "/usr/bin/" + name)
-    monkeypatch.setattr(sound, "_run_quietly", lambda cmd: calls.append(cmd) or True)
+    monkeypatch.setattr(
+        sound.shutil,
+        "which",
+        lambda name: "/usr/bin/paplay" if name == "paplay" else None,
+    )
+
+    def fake_run(cmd, stdout, stderr, check):
+        calls.append(cmd)
+
+        class FakeResult:
+            returncode = 0
+
+        return FakeResult()
+
+    monkeypatch.setattr(sound.subprocess, "run", fake_run)
 
     assert sound.play_audio_file(sound_file) is True
     assert calls == [["paplay", str(sound_file)]]
