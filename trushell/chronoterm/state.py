@@ -23,12 +23,15 @@ class AppState:
     joke_sound: str = "cow-sound.mp3"
     version: int = 1
     updated_at_iso: str | None = None
+    z_dirs: dict[str, dict[str, float | int]] | None = None
 
     def __post_init__(self) -> None:
         if self.timezones is None:
             self.timezones = []
         if self.alarms is None:
             self.alarms = []
+        if self.z_dirs is None:
+            self.z_dirs = {}
 
     def touch(self) -> None:
         self.updated_at_iso = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -54,6 +57,7 @@ class StateStore:
             state.joke_sound = file_data.get("joke_sound", "cow-sound.mp3")
             state.version = file_data.get("version", 1)
             state.updated_at_iso = file_data.get("updated_at_iso")
+            state.z_dirs = file_data.get("z_dirs", {})
         except FileNotFoundError:
             return state
         except Exception:
@@ -75,6 +79,7 @@ class StateStore:
                     "joke_sound": state.joke_sound,
                     "version": state.version,
                     "updated_at_iso": state.updated_at_iso,
+                    "z_dirs": state.z_dirs,
                 },
                 state_file,
                 indent=2,

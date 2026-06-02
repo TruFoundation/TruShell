@@ -98,6 +98,7 @@ trushell> ls
 | `settings` | Change persisted preferences. |
 | `edit <file>` | Open the built-in Textual editor. |
 | `cd <dir>` | Change TruShell's current directory. |
+| `z [options] [pattern]` | Jump to or list frequently used directories by fuzzy path matching. |
 | `help` | Print command help. |
 | `exit` or `quit` | Leave the REPL. |
 
