@@ -61,10 +61,10 @@ def _play_sound(filename: str) -> None:
 
 def _joke_preferences() -> tuple[str, str]:
     state = StateStore().load()
-    return (
+    return 
         state.joke_character or DEFAULT_JOKE_CHARACTER,
         state.joke_sound or DEFAULT_JOKE_SOUND,
-    )
+    
 
 
 def _render_joke(character_name: str, text: str) -> str:
