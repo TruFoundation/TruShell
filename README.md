@@ -29,6 +29,14 @@ cd trushell
 pip install -e ".[dev]"
 ```
 
+After installation, the `trushell` console script is added to your shell `PATH` and can be run directly.
+
+If you are working from the source tree without installing, run:
+
+```bash
+PYTHONPATH=. python -m trushell
+```
+
 ## Quick Start
 
 ```bash
