@@ -37,6 +37,7 @@ def play_audio_file(path: str | Path) -> bool:
     Returns False when a player was attempted but did not confirm success.
     """
     sound_path = Path(path)
+    sound_path_str = str(sound_path)
 
     if sys.platform.startswith("win"):
         playable_path = _resolve_windows_sound_path(sound_path)
@@ -53,15 +54,15 @@ def play_audio_file(path: str | Path) -> bool:
     if sys.platform == "darwin":
         if not shutil.which("afplay"):
             raise AudioPlaybackUnavailable("afplay is unavailable")
-        return _run_quietly(["afplay", str(sound_path)])
+        return _run_quietly(["afplay", sound_path_str])
 
     attempted_player = False
     for player in (
-        ["paplay", str(sound_path)],
-        ["aplay", str(sound_path)],
-        ["ffplay", "-nodisp", "-autoexit", str(sound_path)],
-        ["mpg123", "-q", str(sound_path)],
-        ["mpg321", "-q", str(sound_path)],
+        ["paplay", sound_path_str],
+        ["aplay", sound_path_str],
+        ["ffplay", "-nodisp", "-autoexit", sound_path_str],
+        ["mpg123", "-q", sound_path_str],
+        ["mpg321", "-q", sound_path_str],
     ):
         if shutil.which(player[0]):
             attempted_player = True
