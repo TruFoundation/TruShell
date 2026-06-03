@@ -35,10 +35,19 @@ class ChronoTerm:
         console.print(Text(f"\n🔔 {msg}", style="bold red"))
 
 
-chrono = ChronoTerm()
+_chrono: ChronoTerm | None = None
+
+
+def _get_chrono() -> ChronoTerm:
+    """Lazy singleton: create ChronoTerm on first access, not at import time."""
+    global _chrono
+    if _chrono is None:
+        _chrono = ChronoTerm()
+    return _chrono
 
 
 def _refresh_state() -> None:
+    chrono = _get_chrono()
     chrono.state = chrono.store.load()
     chrono.tz.state = chrono.state
     chrono.alarms.state = chrono.state
@@ -51,9 +60,9 @@ def _current_clock_display(clock_format: str) -> tuple[str, str | None]:
 
 
 def _print_stopwatch_status(action: str) -> None:
-    console.print(f"Stopwatch: [bold]{chrono.sw.status()}[/bold] {chrono.sw.render()}")
+    console.print(f"Stopwatch: [bold]{_get_chrono().sw.status()}[/bold] {_get_chrono().sw.render()}")
     if action == "show":
-        laps = chrono.sw.render_laps()
+        laps = _get_chrono().sw.render_laps()
         for idx, lap in enumerate(laps, start=1):
             console.print(f"  Lap {idx}: {lap}")
 
@@ -81,13 +90,13 @@ def _tz_table(tzs: list[str]) -> Table:
 @app.command()
 def now() -> None:
     _refresh_state()
-    console.print(chrono.tz.now_table())
+    console.print(_get_chrono().tz.now_table())
 
 
 @app.command()
 def time() -> None:
     _refresh_state()
-    state = chrono.store.load()
+    state = _get_chrono().store.load()
     clock_text, meridiem = _current_clock_display(state.clock_format)
     console.print(clock_ascii(clock_text, state.time_template))
     if meridiem is not None:
@@ -98,24 +107,24 @@ def time() -> None:
 @app.command()
 def world() -> None:
     _refresh_state()
-    console.print(chrono.tz.world_table())
+    console.print(_get_chrono().tz.world_table())
 
 
 @app.command()
 def tz(action: str = typer.Argument("list", help="list | add | remove"), name: Optional[str] = typer.Argument(None, help="IANA Name (e.g. Europe/London)")) -> None:
     _refresh_state()
     if action == "list":
-        console.print(_tz_table(chrono.tz.list()))
+        console.print(_tz_table(_get_chrono().tz.list()))
     elif action == "add" and name:
         try:
-            chrono.tz.add(name)
+            _get_chrono().tz.add(name)
             timezone_obj = pytz.timezone(name)
             aware_datetime = datetime.now(timezone_obj).strftime("%H:%M")
             console.print(f"[green]Added:[/green] {name} [{aware_datetime}]")
         except Exception as error:
             console.print(f"[bold red]Error:[/bold red] {error}")
     elif action == "remove" and name:
-        if chrono.tz.remove(name):
+        if _get_chrono().tz.remove(name):
             console.print(f"[yellow]Removed:[/yellow] {name}")
         else:
             console.print(f"[red]Timezone not found in favorites.[/red]")
@@ -125,15 +134,15 @@ def tz(action: str = typer.Argument("list", help="list | add | remove"), name: O
 def alarm(action: str = typer.Argument("list", help="list | add | remove"), time: Optional[str] = typer.Argument(None, help="Time as HH:MM or YYYY-MM-DD HH:MM"), tz: Optional[str] = typer.Option(None, "--tz", help="Specific timezone"), label: Optional[str] = typer.Option(None, "--label", help="Alarm label")) -> None:
     _refresh_state()
     if action == "list":
-        console.print(chrono.alarms.alarms_table())
+        console.print(_get_chrono().alarms.alarms_table())
     elif action == "add" and time:
         try:
-            alarm_obj = chrono.alarms.add(time_str=time, tz_name=tz, label=label)
+            alarm_obj = _get_chrono().alarms.add(time_str=time, tz_name=tz, label=label)
             console.print(f"[green]Alarm set:[/green] {alarm_obj['id']} at {alarm_obj['when_iso']}")
         except Exception as error:
             console.print(f"[bold red]Error:[/bold red] {error}")
     elif action == "remove" and time:
-        if chrono.alarms.remove(time):
+        if _get_chrono().alarms.remove(time):
             console.print(f"[yellow]Removed alarm:[/yellow] {time}")
         else:
             console.print(f"[red]Alarm ID not found.[/red]")
@@ -142,19 +151,19 @@ def alarm(action: str = typer.Argument("list", help="list | add | remove"), time
 @app.command()
 def sw(action: str = typer.Argument("show", help="start | pause | lap | reset | show")) -> None:
     if action == "start":
-        chrono.sw.start()
+        _get_chrono().sw.start()
     elif action == "pause":
-        chrono.sw.pause()
+        _get_chrono().sw.pause()
     elif action == "reset":
-        chrono.sw.reset()
+        _get_chrono().sw.reset()
     elif action == "lap":
-        chrono.sw.lap()
+        _get_chrono().sw.lap()
     _print_stopwatch_status(action)
 
 
 @app.command()
 def shell() -> None:
-    console.print(chrono.tz.now_table())
+    console.print(_get_chrono().tz.now_table())
     console.print("[bold cyan]Interactive ChronoTerm Shell Started. Type 'exit' to quit.[/bold cyan]")
 
     while True:
@@ -175,14 +184,14 @@ def run_shell() -> None:
     try:
         shell()
     finally:
-        chrono.alarms.stop_scheduler()
+        _get_chrono().alarms.stop_scheduler()
 
 
 def run() -> None:
     try:
         app()
     finally:
-        chrono.alarms.stop_scheduler()
+        _get_chrono().alarms.stop_scheduler()
 
 
 if __name__ == "__main__":
