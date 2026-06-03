@@ -11,7 +11,11 @@ from trushell.cli import (
     _handle_edit_command,
     _handle_local_command,
     _handle_os_fallback,
+    _prompt_command,
     _run_external_command,
+    _split_command,
+    is_dangerous_command,
+    parse_and_execute_command,
 )
 
 
@@ -33,7 +37,7 @@ def test_help_shows_usage() -> None:
 def test_unknown_command_uses_os_fallback(monkeypatch) -> None:
     calls = {}
 
-    def fake_run(command: str, shell: bool, check: bool, cwd: str) -> subprocess.CompletedProcess[str]:
+    def fake_run(command: list[str], shell: bool, check: bool, cwd: str) -> subprocess.CompletedProcess[str]:
         calls["command"] = command
         calls["shell"] = shell
         calls["check"] = check
@@ -43,7 +47,131 @@ def test_unknown_command_uses_os_fallback(monkeypatch) -> None:
     monkeypatch.setattr("trushell.cli._run_external_command", fake_run)
 
     assert _handle_os_fallback("pwd") is True
-    assert calls == {"command": "pwd", "shell": True, "check": False, "cwd": os.getcwd()}
+    assert calls == {
+        "command": ["pwd"],
+        "shell": False,
+        "check": False,
+        "cwd": os.getcwd(),
+    }
+
+
+def test_is_dangerous_command_blocks_shell_meta() -> None:
+    assert is_dangerous_command("ls | grep foo") is True
+    assert is_dangerous_command("echo $HOME") is True
+    assert is_dangerous_command("rm file; echo hi") is True
+    assert is_dangerous_command("echo hello") is False
+    assert is_dangerous_command('echo "hello world"') is False
+
+
+def test_handle_local_command_prioritizes_todo(monkeypatch) -> None:
+    calls = {}
+
+    def fake_addtask(task: str, category: str) -> None:
+        calls["task"] = task
+        calls["category"] = category
+
+    monkeypatch.setattr("trushell.project.addtask", fake_addtask)
+
+    command, arguments = _split_command('addtask "Review PR" "Work"')
+    result = _handle_local_command(command, arguments)
+
+    assert result == "handled"
+    assert calls == {"task": "Review PR", "category": "Work"}
+
+
+def test_handle_local_command_addtask_escaped_quotes(monkeypatch) -> None:
+    calls = {}
+
+    def fake_addtask(task: str, category: str) -> None:
+        calls["task"] = task
+        calls["category"] = category
+
+    monkeypatch.setattr("trushell.project.addtask", fake_addtask)
+
+    command, arguments = _split_command(
+        'addtask "Finish report with \\"quotes\\" inside" "Work"'
+    )
+    result = _handle_local_command(command, arguments)
+
+    assert result == "handled"
+    assert calls == {
+        "task": 'Finish report with "quotes" inside',
+        "category": "Work",
+    }
+
+
+def test_split_command_returns_empty_on_unclosed_quotes() -> None:
+    command, arguments = _split_command('addtask "Unclosed quote')
+
+    assert command == ""
+    assert arguments == []
+
+
+def test_prompt_command_warns_on_multiline_input(monkeypatch) -> None:
+    messages = []
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "echo hi\nls")
+    monkeypatch.setattr(
+        "trushell.project.typer.secho",
+        lambda message, fg=None: messages.append((message, fg)),
+    )
+
+    raw, command, arguments = _prompt_command()
+
+    assert raw == ""
+    assert command == ""
+    assert arguments == []
+    assert messages and "Please enter commands one at a time" in messages[0][0]
+
+
+def test_prompt_command_warns_on_invalid_syntax(monkeypatch) -> None:
+    messages = []
+
+    monkeypatch.setattr("builtins.input", lambda prompt: 'addtask "Unclosed quote')
+    monkeypatch.setattr(
+        "trushell.project.typer.secho",
+        lambda message, fg=None: messages.append((message, fg)),
+    )
+
+    raw, command, arguments = _prompt_command()
+
+    assert raw == ""
+    assert command == ""
+    assert arguments == []
+    assert messages and "Invalid syntax" in messages[0][0]
+
+
+def test_parse_and_execute_command_handles_unclosed_quotes(monkeypatch) -> None:
+    messages = []
+
+    monkeypatch.setattr(
+        "trushell.project.typer.secho",
+        lambda message, fg=None: messages.append((message, fg)),
+    )
+
+    assert parse_and_execute_command('addtask "Unclosed quote') is True
+    assert messages and "Invalid syntax" in messages[0][0]
+
+
+def test_parse_and_execute_command_runs_simple_external(monkeypatch) -> None:
+    calls = {}
+
+    def fake_run(command: list[str], shell: bool, check: bool, cwd: str) -> subprocess.CompletedProcess[str]:
+        calls["command"] = command
+        calls["shell"] = shell
+        calls["check"] = check
+        calls["cwd"] = cwd
+        return subprocess.CompletedProcess(args=command, returncode=0)
+
+    monkeypatch.setattr("trushell.project._run_external_command", fake_run)
+
+    assert parse_and_execute_command("echo hi") is True
+    assert calls == {
+        "command": ["echo", "hi"],
+        "shell": False,
+        "check": False,
+        "cwd": os.getcwd(),
+    }
 
 
 def test_run_external_command_profiles_resources(monkeypatch) -> None:
@@ -98,7 +226,7 @@ def test_cd_command_changes_directory_and_runs_ls(monkeypatch) -> None:
     def fake_chdir(path: str) -> None:
         calls["chdir"] = path
 
-    def fake_run(command: str, shell: bool, check: bool, cwd: str) -> SimpleNamespace:
+    def fake_run(command: list[str], shell: bool, check: bool, cwd: str) -> SimpleNamespace:
         calls["ls_command"] = command
         calls["ls_shell"] = shell
         calls["ls_check"] = check
@@ -108,8 +236,15 @@ def test_cd_command_changes_directory_and_runs_ls(monkeypatch) -> None:
     monkeypatch.setattr("trushell.cli.os.chdir", fake_chdir)
     monkeypatch.setattr("trushell.cli._run_external_command", fake_run)
 
-    assert _handle_cd_command("cd /tmp") is True
-    assert calls == {"chdir": "/tmp", "ls_command": "ls", "ls_shell": True, "ls_check": False, "ls_cwd": os.getcwd()}
+    command, arguments = _split_command("cd /tmp")
+    assert _handle_cd_command(command, arguments) is True
+    assert calls == {
+        "chdir": "/tmp",
+        "ls_command": ["ls"],
+        "ls_shell": False,
+        "ls_check": False,
+        "ls_cwd": os.getcwd(),
+    }
 
 
 def test_cd_without_target_prints_syntax_hint(monkeypatch) -> None:
@@ -127,7 +262,8 @@ def test_cd_without_target_prints_syntax_hint(monkeypatch) -> None:
     monkeypatch.setattr("trushell.cli.os.chdir", fake_chdir)
     monkeypatch.setattr("trushell.cli.subprocess.run", fake_run)
 
-    assert _handle_cd_command("cd") is True
+    command, arguments = _split_command("cd")
+    assert _handle_cd_command(command, arguments) is True
     assert calls == {}
 
 
@@ -139,7 +275,8 @@ def test_addtask_missing_arguments_is_blocked(monkeypatch) -> None:
         lambda message, fg=None: messages.append((message, fg)),
     )
 
-    assert _handle_local_command("addtask", "") == "handled"
+    command, arguments = _split_command("addtask")
+    assert _handle_local_command(command, arguments) == "handled"
 
 
 def test_edit_requires_filename(monkeypatch) -> None:
@@ -150,7 +287,8 @@ def test_edit_requires_filename(monkeypatch) -> None:
         lambda message, fg=None: messages.append((message, fg)),
     )
 
-    assert _handle_edit_command("edit") is True
+    command, arguments = _split_command("edit")
+    assert _handle_edit_command(command, arguments) is True
     assert messages and "Syntax: edit <filename>" in messages[0][0]
 
 
@@ -170,7 +308,8 @@ def test_edit_launches_editor_for_existing_file(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr("trushell.cli.TruShellEditor", FakeEditor)
 
-    assert _handle_edit_command(f"edit {file_path}") is True
+    command, arguments = _split_command(f"edit {file_path}")
+    assert _handle_edit_command(command, arguments) is True
     assert calls == {"filename": str(file_path), "initial_text": "hello", "ran": True}
 
 
