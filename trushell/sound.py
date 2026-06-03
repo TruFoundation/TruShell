@@ -1,8 +1,8 @@
 from __future__ import annotations
-import os
-import sys
+
 import shutil
 import subprocess
+import sys
 
 
 def play_alarm() -> None:
@@ -10,9 +10,9 @@ def play_alarm() -> None:
     try:
         if sys.platform.startswith("win"):
             import winsound
+
             winsound.Beep(1200, 400)
             winsound.Beep(900, 400)
-        
         elif sys.platform == "darwin":
             subprocess.run(
                 ["afplay", "/System/Library/Sounds/Glass.aiff"],
@@ -20,8 +20,7 @@ def play_alarm() -> None:
                 stderr=subprocess.DEVNULL,
                 check=False,
             )
-        
-        else:  # Linux/Unix
+        else:
             for cmd in [
                 ["paplay", "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"],
                 ["aplay", "/usr/share/sounds/alsa/Front_Center.wav"],
@@ -36,10 +35,8 @@ def play_alarm() -> None:
                     )
                     if result.returncode == 0:
                         return
-            
             sys.stdout.write("\007" * 3)
             sys.stdout.flush()
-    
     except Exception:
         sys.stdout.write("\007")
         sys.stdout.flush()

@@ -2,7 +2,7 @@
 
 > **A modern, Linux-native productivity shell that integrates seamlessly with your workflow**
 
-TruShell is not just another terminal—it's a **productivity powerhouse** that combines task management, time utilities, jokes for breaks, and a native shell experience. Built for developers who want to stay in flow without switching contexts.
+TruShell is not just another terminal, it's a **productivity powerhouse** that combines task management, time utilities, jokes for breaks, and a native shell experience. Built for developers who want to stay in flow without switching contexts.
 
 ## Why TruShell?
 

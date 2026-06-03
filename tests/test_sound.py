@@ -1,6 +1,6 @@
 import subprocess
 
-from trushell.chronoterm import sound
+from trushell import sound
 
 
 def test_play_alarm_uses_quiet_subprocess(monkeypatch):

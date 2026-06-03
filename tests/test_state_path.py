@@ -1,4 +1,4 @@
-from trushell.chronoterm.state import default_state_path
+from trushell.state import default_state_path
 
 
 def test_default_state_path_contains_app_folder() -> None:

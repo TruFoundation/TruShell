@@ -19,7 +19,7 @@ def run_edit_command(args: str) -> None:
             return
 
     try:
-        from trushell.project import TruShellEditor
+        from trushell.cli import TruShellEditor
 
         TruShellEditor(str(file_path), initial_text=initial_text).run()
     except Exception as error:

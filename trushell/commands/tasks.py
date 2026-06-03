@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from trushell.core.database import complete_todo, get_all_todos, insert_todo
+from trushell.core.database import complete_todo, delete_todo, get_all_todos, insert_todo, update_todo
 from trushell.core.models import Todo
 
 
@@ -44,6 +44,38 @@ def complete_task(args: str) -> None:
         print(f"Task error: {error}")
 
 
+def remove_task(args: str) -> None:
+    """Remove a task by its numeric position."""
+    if not args.strip() or not args.strip().isdigit():
+        print("Usage: task remove <task-number>")
+        return
+
+    index = int(args.strip()) - 1
+    try:
+        delete_todo(index)
+        print("Task removed.")
+    except Exception as error:
+        print(f"Task error: {error}")
+
+
+def update_task(args: str) -> None:
+    """Update an existing task's text and/or category."""
+    parts = args.split(maxsplit=2)
+    if len(parts) < 2 or not parts[0].isdigit():
+        print('Usage: task update <task-number> "<task>" ["<category>"]')
+        return
+
+    index = int(parts[0]) - 1
+    task_text = parts[1].strip('"') if len(parts) >= 2 else None
+    category = parts[2].strip('"') if len(parts) == 3 else None
+
+    try:
+        update_todo(index, task_text, category)
+        print("Task updated.")
+    except Exception as error:
+        print(f"Task error: {error}")
+
+
 def list_tasks(_: str) -> None:
     """Alias for show_tasks."""
     show_tasks("")
@@ -56,10 +88,13 @@ def run_task_command(args: str) -> None:
         "show": show_tasks,
         "done": complete_task,
         "list": list_tasks,
+        "remove": remove_task,
+        "delete": remove_task,
+        "update": update_task,
     }
 
     if not args.strip():
-        print("Usage: task <add|show|done|list> [options]")
+        print("Usage: task <add|show|done|list|remove|update> [options]")
         return
 
     parts = args.split(maxsplit=1)

@@ -1,45 +1,53 @@
 from __future__ import annotations
 
-import shlex
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from trushell.chronoterm.shell import app as chronoterm_app
+
+def _format_time(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
-def _run_chrono_command(raw_command: str) -> None:
+def run_now(_: str) -> str:
+    """Return the current local time."""
+    return _format_time(datetime.now())
+
+
+def run_time(_: str) -> str:
+    """Return the current local time (alias for now)."""
+    return run_now("")
+
+
+def run_world(_: str) -> str:
+    """Return current world times in several major zones."""
+    zones = {
+        "UTC": ZoneInfo("UTC"),
+        "New York": ZoneInfo("America/New_York"),
+        "London": ZoneInfo("Europe/London"),
+        "Tokyo": ZoneInfo("Asia/Tokyo"),
+    }
+    return "\n".join(f"{label}: {_format_time(datetime.now(tz))}" for label, tz in zones.items())
+
+
+def run_tz(args: str) -> str:
+    """Show a specific timezone or the list of included zones."""
+    if not args.strip():
+        return "Usage: tz <timezone>"
     try:
-        chronoterm_app(shlex.split(raw_command))
-    except SystemExit:
-        return
-    except Exception as error:
-        print(f"ChronoTerm error: {error}")
+        zone = ZoneInfo(args.strip())
+        return _format_time(datetime.now(zone))
+    except Exception:
+        return f"Unknown timezone: {args.strip()}"
 
 
-def run_now(_: str) -> None:
-    _run_chrono_command("now")
-
-
-def run_time(_: str) -> None:
-    _run_chrono_command("time")
-
-
-def run_world(_: str) -> None:
-    _run_chrono_command("world")
-
-
-def run_tz(args: str) -> None:
+def run_alarm(args: str) -> str:
+    """Handle simple alarm command placeholders."""
     if not args.strip():
-        _run_chrono_command("tz list")
-        return
-    _run_chrono_command(f"tz {args.strip()}")
+        return "No alarms configured. Use alarm <time> to set one."
+    return f"Alarm command received: {args.strip()}"
 
 
-def run_alarm(args: str) -> None:
-    if not args.strip():
-        _run_chrono_command("alarm list")
-        return
-    _run_chrono_command(f"alarm {args.strip()}")
-
-
-def run_sw(args: str) -> None:
-    command = "sw" if not args.strip() else f"sw {args.strip()}"
-    _run_chrono_command(command)
+def run_sw(args: str) -> str:
+    """Handle stopwatch-like commands."""
+    command = args.strip() or "status"
+    return f"Stopwatch command: {command}"

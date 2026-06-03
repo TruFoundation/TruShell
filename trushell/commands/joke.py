@@ -8,26 +8,24 @@ import pyjokes
 
 
 def _sound_path(filename: str) -> Path:
-    return Path(__file__).resolve().parents[1] / "chronoterm" / "sounds" / filename
+    return Path(__file__).resolve().parents[1] / "sounds" / filename
 
 
 def _play_sound(filename: str) -> None:
     try:
-        # lazy import to avoid optional dependency at kernel import time
-        from trushell.chronoterm.sound import play_alarm
+        from trushell.sound import play_alarm
 
         sound_path = _sound_path(filename)
         if not sound_path.exists():
             return
         play_alarm()
     except Exception:
-        # best-effort: do not raise from sound playing
         return
 
 
 def _joke_preferences() -> Tuple[str, str]:
     try:
-        from trushell.chronoterm.state import StateStore
+        from trushell.state import StateStore
 
         state = StateStore().load()
         return state.joke_character or "cow", state.joke_sound or "cow-sound.mp3"
@@ -49,22 +47,3 @@ def run_joke_trex_command(_: str) -> str:
     joke_text = pyjokes.get_joke()
     _play_sound("trex-sound.mp3")
     return cowsay.trex(joke_text)
-from __future__ import annotations
-
-from trushell.pyfunny import joke, joke_trex
-
-
-def run_joke_command(_: str) -> None:
-    """Tell a random joke with the default TruShell humor engine."""
-    try:
-        print(joke())
-    except Exception as error:
-        print(f"Joke error: {error}")
-
-
-def run_joke_trex_command(_: str) -> None:
-    """Tell a T-Rex joke with sound."""
-    try:
-        print(joke_trex())
-    except Exception as error:
-        print(f"Joke error: {error}")
