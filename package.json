@@ -2,7 +2,6 @@
   "name": "@truos/trushell",
   "version": "1.0.2",
   "description": "TruShell - A modern terminal-based operating workspace interface",
-  "main": "bin/index.js",
   "type": "commonjs",
   "directories": {
     "test": "tests"
@@ -11,14 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "pip install typer rich pyjokes cowsay pytz platformdirs textual || pip3 install typer rich pyjokes cowsay pytz platformdirs textual"
   },
-  "bin": {
-    "truos": "./bin/index.js",
-    "trushell": "./bin/index.js",
-    "atoffice-shell": "./bin/index.js",
-    "TruOS": "./bin/index.js"
-  },
+
   "files": [
-    "bin/",
     "trushell/",
     "README.md",
     "LICENSE"
