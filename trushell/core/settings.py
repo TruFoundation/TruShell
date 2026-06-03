@@ -5,7 +5,7 @@ from typing import Sequence
 
 import typer
 
-from .chronoterm.state import StateStore
+from trushell.state import StateStore
 
 COMMANDS = ["time", "world", "joke"]
 TIME_TEMPLATES = [
@@ -54,7 +54,7 @@ def _select_option(prompt: str, options: Sequence[str]) -> str | None:
 
 
 def _available_sound_files() -> list[str]:
-    sounds_dir = Path(__file__).resolve().parent / "chronoterm" / "sounds"
+    sounds_dir = Path(__file__).resolve().parents[1] / "sounds"
     if not sounds_dir.exists():
         return []
     return sorted([path.name for path in sounds_dir.iterdir() if path.is_file()])
