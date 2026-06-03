@@ -277,27 +277,21 @@ def _handle_os_fallback(raw_command: str) -> bool:
 
 def run_interactive_shell() -> None:
     """Persistent REPL loop for the TruShell core."""
+    from .core.trukernel import EXIT_SENTINEL, TruKernel
+
+    kernel = TruKernel()
+
     typer.secho("Entering TruShell. Type 'exit' to quit.", fg=typer.colors.CYAN)
 
     while True:
         try:
-            raw_command, command, argument = _prompt_command()
+            raw_command, command, _ = _prompt_command()
         except (KeyboardInterrupt, EOFError):
             typer.echo("")
             break
 
-        local_result = _handle_local_command(command, argument)
-        if local_result == "exit":
+        result = kernel.execute_command(raw_command)
+        if result == EXIT_SENTINEL:
             break
-        if local_result == "handled":
-            continue
-        if _handle_chronoterm_command(raw_command, command):
-            continue
-        if _handle_cd_command(raw_command):
-            continue
-        if _handle_edit_command(raw_command):
-            continue
-        if _handle_os_fallback(raw_command):
-            continue
-
-        typer.secho(f"Unknown command: {command}", fg=typer.colors.RED)
+        if result is False:
+            typer.secho(f"Unknown command: {command}", fg=typer.colors.RED)

@@ -4,8 +4,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .database import complete_todo, delete_todo, get_all_todos, insert_todo, update_todo
-from .model import Todo
+from trushell.core.database import complete_todo, delete_todo, get_all_todos, insert_todo, update_todo
+from trushell.core.models import Todo
 
 console = Console()
 app = typer.Typer(name="todo", help="Manage todo tasks.")

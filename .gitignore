@@ -13,3 +13,7 @@ dist/
 build/
 .idea/
 .vscode/
+
+# Ignore runtime TruShell user configuration and local runtime state
+trushell/config/my_command_config.md
+.trushell/
