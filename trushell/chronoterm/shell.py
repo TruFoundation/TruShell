@@ -46,6 +46,13 @@ def _get_chrono() -> ChronoTerm:
     return _chrono
 
 
+def __getattr__(name: str):
+    """Backward-compatible lazy access to the module-level 'chrono' singleton."""
+    if name == "chrono":
+        return _get_chrono()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def _refresh_state() -> None:
     chrono = _get_chrono()
     chrono.state = chrono.store.load()
