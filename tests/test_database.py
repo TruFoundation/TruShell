@@ -41,7 +41,7 @@ def test_get_all_todos_works_with_local_connections(monkeypatch, tmp_path) -> No
 
 def test_get_all_todos_returns_rows_ordered_by_position(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "todos.db"
-    monkeypatch.setattr("trushell.database.DB_PATH", db_path)
+    monkeypatch.setattr("trushell.core.database.DB_PATH", db_path)
 
     _create_table()
     with get_db_connection() as conn:
