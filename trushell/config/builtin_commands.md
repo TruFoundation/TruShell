@@ -14,4 +14,5 @@
 {cmd: tz}; "run_tz()"; [trushell/commands/chronoterm.py];
 {cmd: alarm}; "run_alarm()"; [trushell/commands/chronoterm.py];
 {cmd: sw}; "run_sw()"; [trushell/commands/chronoterm.py];
+{cmd: csv-view}; "run_csv_view()"; [trushell/commands/data.py];
 
