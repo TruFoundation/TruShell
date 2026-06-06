@@ -27,6 +27,7 @@ dependencies = [
   "pyjokes>=0.6.0",
   "cowsay>=4.0",
   "pytz>=2024.1",
+  "tzdata>=2024.1",
   "platformdirs>=3.0.0",
   "textual>=0.86.0",
   "psutil>=5.9.0",

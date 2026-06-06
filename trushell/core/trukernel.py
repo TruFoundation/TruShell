@@ -4,6 +4,7 @@ import importlib.util
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ EXIT_SENTINEL = "__TRUSHELL_EXIT__"
 
 
 _kernel_instance: TruKernel | None = None
+_kernel_lock = threading.Lock()
 
 class TruKernel:
     """Central manifest-driven dispatch engine for TruShell."""
@@ -306,6 +308,7 @@ def get_kernel() -> TruKernel:
     Used by commands like help that need a live registry.
     """
     global _kernel_instance
-    if _kernel_instance is None:
-        _kernel_instance = TruKernel()
+    with _kernel_lock:
+        if _kernel_instance is None:
+            _kernel_instance = TruKernel()
     return _kernel_instance
