@@ -4,7 +4,7 @@ A lightweight, context‑aware shell for developers
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 
-===========================================================
+---
 
 TruShell is not a full replacement for bash or zsh. It is a small
 utility shell that sits next to your normal terminal and helps you

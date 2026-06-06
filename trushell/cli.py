@@ -18,10 +18,9 @@ except ImportError:  # pragma: no cover
     psutil = None
 
 from . import __version__
-from .core.trukernel import EXIT_SENTINEL, TruKernel
+from .core.trukernel import EXIT_SENTINEL, get_kernel
 
 app = typer.Typer(name="trushell", help="TruShell manifest-driven launcher.")
-kernel = TruKernel()
 
 
 def app_with_lower() -> None:
@@ -30,7 +29,7 @@ def app_with_lower() -> None:
         sys.argv[1] = sys.argv[1].lower()
         if sys.argv[1] not in {"--help", "-h", "version"}:
             raw = " ".join(sys.argv[1:])
-            kernel.execute_command(raw)
+            get_kernel().execute_command(raw)
             return
     app()
 
@@ -299,7 +298,7 @@ def _handle_os_fallback(raw_command: str) -> bool:
 
 def run_interactive_shell() -> None:
     """Persistent REPL loop for the TruShell core."""
-    kernel = TruKernel()
+    kernel = get_kernel()
 
     typer.secho("Entering TruShell. Type 'exit' to quit.", fg=typer.colors.CYAN)
 

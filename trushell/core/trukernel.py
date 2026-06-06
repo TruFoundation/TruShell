@@ -141,6 +141,18 @@ class TruKernel:
                 self.logger.info("Exit command received")
                 return EXIT_SENTINEL
 
+            # Special-case TruShell directory jump helper
+            if isinstance(result, str) and result.startswith("__TRUSHELL_CD__: "):
+                target_path = result.split(": ", 1)[1].strip()
+                try:
+                    os.chdir(target_path)
+                    print(os.getcwd())
+                    return True
+                except OSError as error:
+                    print(f"cd: {error}")
+                    self.logger.warning("Failed to change directory to %s: %s", target_path, error)
+                    return False
+
             # Only print if the function explicitly returned a value
             # This prevents the kernel from printing 'None' when functions
             # perform their own prints and return None.
