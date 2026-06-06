@@ -76,6 +76,8 @@ class SettingsApp(App):
         self.settings = self.manager.load()
         self.dirty_settings = dict(self.settings)
         self.selected_category = "General"
+        # Track changes to settings without losing data when switching categories
+        self.dirty_settings: dict = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -111,6 +113,10 @@ class SettingsApp(App):
             self._save_settings()
         elif event.button.id == "exit_button":
             self.exit()
+
+    def _track_change(self, key: str, value) -> None:
+        """Track changes to settings without losing data when switching categories."""
+        self.dirty_settings[key] = value
 
     def action_save_settings(self) -> None:
         self._save_settings()
@@ -169,6 +175,8 @@ class SettingsApp(App):
                     id="theme_selector",
                 ),
             )
+            select_widget.watch_value(lambda value: self._track_change("theme", value))
+            add_field("Theme:", select_widget)
         elif current_cat == "Navigation":
             add_field(
                 "Show git status:",
@@ -212,6 +220,8 @@ class SettingsApp(App):
             self.manager.set(key, value)
         self.manager.save()
 
+        # Clear dirty settings after save
+        self.dirty_settings.clear()
         self._apply_theme(theme)
         self.notify("Settings saved.", severity="success")
 

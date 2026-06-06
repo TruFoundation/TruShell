@@ -7,29 +7,35 @@ import subprocess
 
 
 def run_help(args: str) -> None:
+    """Display available commands by reading the manifest registry.
+    
+    If args contains a command name, print its docstring if available.
+    Otherwise, list all available commands.
+    """
+    # Import here to avoid circular dependency if trukernel imports core
     """Display available commands or the docstring for a specific command."""
     from trushell.core.trukernel import get_kernel
 
     kernel = get_kernel()
-    command = args.strip().lower() if args else ""
-
-    if command:
-        entry = kernel.registry.get(command)
-        if entry is not None:
-            try:
-                module_name = entry["path"].replace("/", ".").removesuffix(".py")
-                module = importlib.import_module(module_name)
-                func = getattr(module, entry["function"])
-                doc = inspect.getdoc(func)
-                if doc:
-                    print(doc)
-                    return
-            except Exception:
-                pass
-
-        print(f"No help available for '{command}'.")
+    
+    command_name = args.strip().lower() if args else None
+    
+    # If a specific command is requested, show its help
+    if command_name and command_name in kernel.registry:
+        entry = kernel.registry[command_name]
+        try:
+            module = kernel._import_module(entry["path"])
+            func = getattr(module, entry["function"], None)
+            if func and func.__doc__:
+                print(f"Help for '{command_name}':")
+                print(func.__doc__)
+                return
+        except Exception:
+            pass
+        print(f"No detailed help available for '{command_name}'.")
         return
-
+    
+    # Otherwise, list all commands
     cmds = sorted(kernel.registry.keys())
     print("Available commands:")
     col_width = max(len(c) for c in cmds) + 2

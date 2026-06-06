@@ -43,6 +43,12 @@ class PluginManager:
             _instance = PluginManager(kernel)
         return _instance
 
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance. Used for testing."""
+        global _instance
+        _instance = None
+
     def discover(self) -> List[Path]:
         candidates: List[Path] = []
         # user plugin directory (~/.trushell/plugins)

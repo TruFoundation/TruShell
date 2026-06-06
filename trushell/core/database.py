@@ -2,26 +2,46 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from platformdirs import user_data_dir
 
 from trushell.core.models import Todo
 
-APP_NAME = "TruShell"
-APP_AUTHOR = "AkshajSinghal"
-DATA_DIR = Path(user_data_dir(APP_NAME, APP_AUTHOR))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "todos.db"
+# Global state to track initialization
+_INITIALIZED = False
+_DB_PATH: Optional[Path] = None
 
 
-def get_db_connection() -> sqlite3.Connection:
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+def _get_db_path() -> Path:
+    """Get the path to the database file."""
+    global _DB_PATH
+    if _DB_PATH is None:
+        data_dir = Path(user_data_dir("TruShell", "AkshajSinghal"))
+        data_dir.mkdir(parents=True, exist_ok=True)
+        _DB_PATH = data_dir / "todos.db"
+    return _DB_PATH
 
 
-def _create_table() -> None:
-    with get_db_connection() as conn:
-        conn.execute(
+def _ensure_initialized() -> None:
+    """
+    Create the database and tables if they don't exist.
+    This function is idempotent and safe to call multiple times.
+    Does NOT call get_db_connection() to avoid infinite recursion.
+    """
+    global _INITIALIZED
+    
+    if _INITIALIZED:
+        return
+
+    db_path = _get_db_path()
+    
+    # Open a direct connection to initialize.
+    # We do NOT use get_db_connection() here to avoid recursion.
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
             """CREATE TABLE IF NOT EXISTS todos (
                 task TEXT,
                 category TEXT,
@@ -31,9 +51,20 @@ def _create_table() -> None:
                 position INTEGER
             )"""
         )
+        conn.commit()
+        _INITIALIZED = True
+    finally:
+        conn.close()
 
 
-_create_table()
+def get_db_connection() -> sqlite3.Connection:
+    """
+    Return a connection to the SQLite database.
+    Ensures the database is initialized before returning the connection.
+    """
+    _ensure_initialized()
+    db_path = _get_db_path()
+    return sqlite3.connect(str(db_path), check_same_thread=False)
 
 
 def insert_todo(todo: Todo) -> None:

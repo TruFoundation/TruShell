@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shlex
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,7 @@ EXIT_SENTINEL = "__TRUSHELL_EXIT__"
 
 
 _kernel_instance: TruKernel | None = None
+_kernel_lock = threading.Lock()
 
 class TruKernel:
     """Central manifest-driven dispatch engine for TruShell."""
@@ -242,16 +245,23 @@ class TruKernel:
         """Try to run an unregistered command via the host OS shell.
 
         Special-cases 'cd' because it must change the Python process CWD.
+        Blocks shell metacharacters for security.
         """
         full_cmd = f"{command} {args}".strip()
 
         if command == "cd":
             return self._handle_cd(args)
 
+        # Block dangerous shell metacharacters
+        if "|" in full_cmd or ">" in full_cmd or "<" in full_cmd:
+            print("Error: pipes and redirects are not allowed")
+            self.logger.warning("Blocked shell metacharacter in command: %s", full_cmd)
+            return False
+
         try:
             result = subprocess.run(
-                full_cmd,
-                shell=True,
+                shlex.split(full_cmd),
+                shell=False,
                 capture_output=True,
                 text=True,
             )
@@ -306,6 +316,7 @@ def get_kernel() -> TruKernel:
     Used by commands like help that need a live registry.
     """
     global _kernel_instance
-    if _kernel_instance is None:
-        _kernel_instance = TruKernel()
+    with _kernel_lock:
+        if _kernel_instance is None:
+            _kernel_instance = TruKernel()
     return _kernel_instance
