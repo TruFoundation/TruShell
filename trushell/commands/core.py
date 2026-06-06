@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib
+import inspect
 import os
 import subprocess
 
@@ -11,7 +13,9 @@ def run_help(args: str) -> None:
     Otherwise, list all available commands.
     """
     # Import here to avoid circular dependency if trukernel imports core
+    """Display available commands or the docstring for a specific command."""
     from trushell.core.trukernel import get_kernel
+
     kernel = get_kernel()
     
     command_name = args.strip().lower() if args else None
@@ -34,7 +38,6 @@ def run_help(args: str) -> None:
     # Otherwise, list all commands
     cmds = sorted(kernel.registry.keys())
     print("Available commands:")
-    # Print in columns
     col_width = max(len(c) for c in cmds) + 2
     cols = 4
     for i, cmd in enumerate(cmds):

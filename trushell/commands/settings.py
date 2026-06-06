@@ -74,6 +74,7 @@ class SettingsApp(App):
         super().__init__(**kwargs)
         self.manager = SettingsManager()
         self.settings = self.manager.load()
+        self.dirty_settings = dict(self.settings)
         self.selected_category = "General"
         # Track changes to settings without losing data when switching categories
         self.dirty_settings: dict = {}
@@ -123,6 +124,27 @@ class SettingsApp(App):
     def action_quit_app(self) -> None:
         self.exit()
 
+    def _update_dirty_setting(self, key: str, value: object) -> None:
+        self.dirty_settings[key] = value
+        self.settings[key] = value
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "prompt_symbol":
+            self._update_dirty_setting("prompt_symbol", event.value)
+        elif event.input.id == "csv_max_rows":
+            self._update_dirty_setting("csv_max_rows", event.value)
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "theme_selector":
+            self._update_dirty_setting("theme", event.value)
+            self._apply_theme(str(event.value))
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        if event.switch.id == "show_git_status":
+            self._update_dirty_setting("show_git_status", bool(event.value))
+        elif event.switch.id == "auto_complete":
+            self._update_dirty_setting("auto_complete", bool(event.value))
+
     def _refresh_form(self) -> None:
         form_container = self.query_one("#form_container", Vertical)
 
@@ -140,61 +162,62 @@ class SettingsApp(App):
         current_cat = self.selected_category
 
         if current_cat == "General":
-            input_widget = Input(value=str(self.settings.get("prompt_symbol", "➜")), id="prompt_symbol")
-            input_widget.watch_value(lambda value: self._track_change("prompt_symbol", value))
-            add_field("Prompt symbol:", input_widget)
+            add_field(
+                "Prompt symbol:",
+                Input(value=str(self.dirty_settings.get("prompt_symbol", self.settings.get("prompt_symbol", "➜"))), id="prompt_symbol"),
+            )
         elif current_cat == "Appearance":
-            select_widget = Select(
-                options=self.THEME_OPTIONS,
-                value=str(self.settings.get("theme", "dark")),
-                id="theme_selector",
+            add_field(
+                "Theme:",
+                Select(
+                    options=self.THEME_OPTIONS,
+                    value=str(self.dirty_settings.get("theme", self.settings.get("theme", "dark"))),
+                    id="theme_selector",
+                ),
             )
             select_widget.watch_value(lambda value: self._track_change("theme", value))
             add_field("Theme:", select_widget)
         elif current_cat == "Navigation":
-            git_switch = Switch(value=bool(self.settings.get("show_git_status", True)), id="show_git_status")
-            git_switch.watch_value(lambda value: self._track_change("show_git_status", value))
-            add_field("Show git status:", git_switch)
-            
-            complete_switch = Switch(value=bool(self.settings.get("auto_complete", True)), id="auto_complete")
-            complete_switch.watch_value(lambda value: self._track_change("auto_complete", value))
-            add_field("Auto complete:", complete_switch)
+            add_field(
+                "Show git status:",
+                Switch(value=bool(self.dirty_settings.get("show_git_status", self.settings.get("show_git_status", True))), id="show_git_status"),
+            )
+            add_field(
+                "Auto complete:",
+                Switch(value=bool(self.dirty_settings.get("auto_complete", self.settings.get("auto_complete", True))), id="auto_complete"),
+            )
         elif current_cat == "Data":
-            csv_input = Input(value=str(self.settings.get("csv_max_rows", 50)), id="csv_max_rows")
-            csv_input.watch_value(lambda value: self._track_change("csv_max_rows", value))
-            add_field("CSV max rows:", csv_input)
+            add_field(
+                "CSV max rows:",
+                Input(value=str(self.dirty_settings.get("csv_max_rows", self.settings.get("csv_max_rows", 50))), id="csv_max_rows"),
+            )
 
     def _save_settings(self) -> None:
-        # Collect all values from dirty_settings and current widgets
-        theme = self.dirty_settings.get("theme") or self.settings.get("theme", "dark")
-        prompt_symbol = self.dirty_settings.get("prompt_symbol") or self.settings.get("prompt_symbol", "➜")
-        show_git_status = self.dirty_settings.get("show_git_status")
-        if show_git_status is None:
-            show_git_status = self.settings.get("show_git_status", True)
-        auto_complete = self.dirty_settings.get("auto_complete")
-        if auto_complete is None:
-            auto_complete = self.settings.get("auto_complete", True)
-        csv_max_rows_value = self.dirty_settings.get("csv_max_rows") or str(self.settings.get("csv_max_rows", 50))
+        theme = str(self.dirty_settings.get("theme", self.settings.get("theme", "dark")))
+        prompt_symbol = str(self.dirty_settings.get("prompt_symbol", self.settings.get("prompt_symbol", "➜")))
+        show_git_status = bool(self.dirty_settings.get("show_git_status", self.settings.get("show_git_status", True)))
+        auto_complete = bool(self.dirty_settings.get("auto_complete", self.settings.get("auto_complete", True)))
+        csv_max_rows_value = self.dirty_settings.get("csv_max_rows", self.settings.get("csv_max_rows", 50))
 
         try:
             csv_max_rows = int(csv_max_rows_value)
-        except ValueError:
+        except (TypeError, ValueError):
             self.notify("CSV max rows must be an integer.", severity="error")
             return
 
-        # Update settings dict with all collected values
-        self.settings["theme"] = theme
-        self.settings["prompt_symbol"] = prompt_symbol
-        self.settings["show_git_status"] = show_git_status
-        self.settings["auto_complete"] = auto_complete
-        self.settings["csv_max_rows"] = csv_max_rows
+        self.dirty_settings.update(
+            {
+                "theme": theme,
+                "prompt_symbol": prompt_symbol,
+                "show_git_status": show_git_status,
+                "auto_complete": auto_complete,
+                "csv_max_rows": csv_max_rows,
+            }
+        )
+        self.settings.update(self.dirty_settings)
 
-        # Persist to disk via manager
-        self.manager.set("theme", theme)
-        self.manager.set("prompt_symbol", prompt_symbol)
-        self.manager.set("show_git_status", show_git_status)
-        self.manager.set("auto_complete", auto_complete)
-        self.manager.set("csv_max_rows", csv_max_rows)
+        for key, value in self.dirty_settings.items():
+            self.manager.set(key, value)
         self.manager.save()
 
         # Clear dirty settings after save

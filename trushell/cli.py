@@ -36,6 +36,9 @@ def app_with_lower() -> None:
             raw = " ".join(argv_copy[1:])
             get_kernel().execute_command(raw)
             return
+
+    if argv != sys.argv:
+        sys.argv = argv
     app()
 
 
