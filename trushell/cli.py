@@ -12,6 +12,7 @@ from rich.console import Console
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Header, TextArea
+from prompt_toolkit import prompt as toolkit_prompt
 
 try:
     import psutil
@@ -28,9 +29,11 @@ console = Console()
 def app_with_lower() -> None:
     """Entry point that normalizes the first argument to lowercase for case-insensitive invocation."""
     if len(sys.argv) > 1:
-        sys.argv[1] = sys.argv[1].lower()
-        if sys.argv[1] not in {"--help", "-h", "version"}:
-            raw = " ".join(sys.argv[1:])
+        # Create a local copy to avoid mutating the global sys.argv
+        argv_copy = sys.argv.copy()
+        argv_copy[1] = argv_copy[1].lower()
+        if argv_copy[1] not in {"--help", "-h", "version"}:
+            raw = " ".join(argv_copy[1:])
             get_kernel().execute_command(raw)
             return
     app()
@@ -46,7 +49,17 @@ def _split_command(user_input: str) -> tuple[str, str]:
 
 
 def _prompt_command() -> tuple[str, str, str]:
-    raw_command = input(f"trushell {os.getcwd()} ❯ ").strip()
+    prompt_text = f"trushell {os.getcwd()} ❯ "
+    try:
+        # Try to use the emoji prompt with UTF-8 encoding support
+        raw_command = toolkit_prompt(prompt_text, enable_history_search=True).strip()
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        # Fallback to plain ASCII prompt if emojis fail (e.g., on Windows with limited encoding)
+        raw_command = input("trushell> ").strip()
+    except Exception:
+        # Further fallback to standard input if prompt_toolkit unavailable or fails
+        raw_command = input("trushell> ").strip()
+    
     command, argument = _split_command(raw_command)
     return raw_command, command, argument
 
@@ -108,38 +121,40 @@ def _run_external_command(
 ) -> subprocess.CompletedProcess[str]:
     process = subprocess.Popen(command, shell=shell, cwd=cwd)
     monitor = None
-    if psutil is not None:
-        try:
-            monitor = psutil.Process(process.pid)
-            monitor.cpu_percent(None)
-        except Exception:
-            monitor = None
-
     peak_rss = 0
     peak_cpu = 0.0
     start = time.perf_counter()
+    
+    try:
+        if psutil is not None:
+            try:
+                monitor = psutil.Process(process.pid)
+                monitor.cpu_percent(None)
+            except Exception:
+                monitor = None
 
-    while True:
-        try:
-            process.wait(timeout=0.05)
-            break
-        except subprocess.TimeoutExpired:
-            if monitor is not None:
-                try:
-                    peak_rss = max(peak_rss, monitor.memory_info().rss)
-                    peak_cpu = max(peak_cpu, monitor.cpu_percent(None))
-                except (Exception, OSError):
-                    break
+        while True:
+            try:
+                process.wait(timeout=0.05)
+                break
+            except subprocess.TimeoutExpired:
+                if monitor is not None:
+                    try:
+                        peak_rss = max(peak_rss, monitor.memory_info().rss)
+                        peak_cpu = max(peak_cpu, monitor.cpu_percent(None))
+                    except (Exception, OSError):
+                        break
 
-    if process.returncode is None:
-        process.wait()
-
-    if monitor is not None:
-        try:
-            peak_rss = max(peak_rss, monitor.memory_info().rss)
-            peak_cpu = max(peak_cpu, monitor.cpu_percent(None))
-        except (Exception, OSError):
-            pass
+        if monitor is not None:
+            try:
+                peak_rss = max(peak_rss, monitor.memory_info().rss)
+                peak_cpu = max(peak_cpu, monitor.cpu_percent(None))
+            except (Exception, OSError):
+                pass
+    finally:
+        # Ensure the process is waited on, even if exceptions occur
+        if process.returncode is None:
+            process.wait()
 
     elapsed = time.perf_counter() - start
     if peak_rss or peak_cpu:
@@ -244,7 +259,7 @@ def _handle_local_command(command: str, argument: str) -> str:
         launch_settings()
         return "handled"
     if command == "help":
-        typer.echo("Available commands: joke, joke_trex, addtask, deletetask, updatetask, completetask, showtask, now, time, world, tz, alarm, sw, settings, exit, help")
+        typer.echo("Available commands: joke, joke_trex, addtask, deletetask, updatetask, completetask, showtasks, now, time, world, tz, alarm, sw, settings, exit, help")
         return "handled"
     return "unhandled"
 

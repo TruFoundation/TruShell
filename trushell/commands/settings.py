@@ -75,6 +75,8 @@ class SettingsApp(App):
         self.manager = SettingsManager()
         self.settings = self.manager.load()
         self.selected_category = "General"
+        # Track changes to settings without losing data when switching categories
+        self.dirty_settings: dict = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -111,6 +113,10 @@ class SettingsApp(App):
         elif event.button.id == "exit_button":
             self.exit()
 
+    def _track_change(self, key: str, value) -> None:
+        """Track changes to settings without losing data when switching categories."""
+        self.dirty_settings[key] = value
+
     def action_save_settings(self) -> None:
         self._save_settings()
 
@@ -134,40 +140,41 @@ class SettingsApp(App):
         current_cat = self.selected_category
 
         if current_cat == "General":
-            add_field(
-                "Prompt symbol:",
-                Input(value=str(self.settings.get("prompt_symbol", "➜")), id="prompt_symbol"),
-            )
+            input_widget = Input(value=str(self.settings.get("prompt_symbol", "➜")), id="prompt_symbol")
+            input_widget.watch_value(lambda value: self._track_change("prompt_symbol", value))
+            add_field("Prompt symbol:", input_widget)
         elif current_cat == "Appearance":
-            add_field(
-                "Theme:",
-                Select(
-                    options=self.THEME_OPTIONS,
-                    value=str(self.settings.get("theme", "dark")),
-                    id="theme_selector",
-                ),
+            select_widget = Select(
+                options=self.THEME_OPTIONS,
+                value=str(self.settings.get("theme", "dark")),
+                id="theme_selector",
             )
+            select_widget.watch_value(lambda value: self._track_change("theme", value))
+            add_field("Theme:", select_widget)
         elif current_cat == "Navigation":
-            add_field(
-                "Show git status:",
-                Switch(value=bool(self.settings.get("show_git_status", True)), id="show_git_status"),
-            )
-            add_field(
-                "Auto complete:",
-                Switch(value=bool(self.settings.get("auto_complete", True)), id="auto_complete"),
-            )
+            git_switch = Switch(value=bool(self.settings.get("show_git_status", True)), id="show_git_status")
+            git_switch.watch_value(lambda value: self._track_change("show_git_status", value))
+            add_field("Show git status:", git_switch)
+            
+            complete_switch = Switch(value=bool(self.settings.get("auto_complete", True)), id="auto_complete")
+            complete_switch.watch_value(lambda value: self._track_change("auto_complete", value))
+            add_field("Auto complete:", complete_switch)
         elif current_cat == "Data":
-            add_field(
-                "CSV max rows:",
-                Input(value=str(self.settings.get("csv_max_rows", 50)), id="csv_max_rows"),
-            )
+            csv_input = Input(value=str(self.settings.get("csv_max_rows", 50)), id="csv_max_rows")
+            csv_input.watch_value(lambda value: self._track_change("csv_max_rows", value))
+            add_field("CSV max rows:", csv_input)
 
     def _save_settings(self) -> None:
-        theme = self.query_one("#theme_selector", Select).value if self.selected_category == "Appearance" else self.settings.get("theme", "dark")
-        prompt_symbol = self.query_one("#prompt_symbol", Input).value if self.selected_category == "General" else self.settings.get("prompt_symbol", "➜")
-        show_git_status = self.query_one("#show_git_status", Switch).value if self.selected_category == "Navigation" else self.settings.get("show_git_status", True)
-        auto_complete = self.query_one("#auto_complete", Switch).value if self.selected_category == "Navigation" else self.settings.get("auto_complete", True)
-        csv_max_rows_value = self.query_one("#csv_max_rows", Input).value if self.selected_category == "Data" else str(self.settings.get("csv_max_rows", 50))
+        # Collect all values from dirty_settings and current widgets
+        theme = self.dirty_settings.get("theme") or self.settings.get("theme", "dark")
+        prompt_symbol = self.dirty_settings.get("prompt_symbol") or self.settings.get("prompt_symbol", "➜")
+        show_git_status = self.dirty_settings.get("show_git_status")
+        if show_git_status is None:
+            show_git_status = self.settings.get("show_git_status", True)
+        auto_complete = self.dirty_settings.get("auto_complete")
+        if auto_complete is None:
+            auto_complete = self.settings.get("auto_complete", True)
+        csv_max_rows_value = self.dirty_settings.get("csv_max_rows") or str(self.settings.get("csv_max_rows", 50))
 
         try:
             csv_max_rows = int(csv_max_rows_value)
@@ -175,12 +182,14 @@ class SettingsApp(App):
             self.notify("CSV max rows must be an integer.", severity="error")
             return
 
+        # Update settings dict with all collected values
         self.settings["theme"] = theme
         self.settings["prompt_symbol"] = prompt_symbol
         self.settings["show_git_status"] = show_git_status
         self.settings["auto_complete"] = auto_complete
         self.settings["csv_max_rows"] = csv_max_rows
 
+        # Persist to disk via manager
         self.manager.set("theme", theme)
         self.manager.set("prompt_symbol", prompt_symbol)
         self.manager.set("show_git_status", show_git_status)
@@ -188,6 +197,8 @@ class SettingsApp(App):
         self.manager.set("csv_max_rows", csv_max_rows)
         self.manager.save()
 
+        # Clear dirty settings after save
+        self.dirty_settings.clear()
         self._apply_theme(theme)
         self.notify("Settings saved.", severity="success")
 
