@@ -25,12 +25,16 @@ app = typer.Typer(name="trushell", help="TruShell manifest-driven launcher.")
 
 def app_with_lower() -> None:
     """Entry point that normalizes the first argument to lowercase for case-insensitive invocation."""
-    if len(sys.argv) > 1:
-        sys.argv[1] = sys.argv[1].lower()
-        if sys.argv[1] not in {"--help", "-h", "version"}:
-            raw = " ".join(sys.argv[1:])
+    argv = sys.argv.copy()
+    if len(argv) > 1:
+        argv[1] = argv[1].lower()
+        if argv[1] not in {"--help", "-h", "version"}:
+            raw = " ".join(argv[1:])
             get_kernel().execute_command(raw)
             return
+
+    if argv != sys.argv:
+        sys.argv = argv
     app()
 
 
@@ -44,7 +48,20 @@ def _split_command(user_input: str) -> tuple[str, str]:
 
 
 def _prompt_command() -> tuple[str, str, str]:
-    raw_command = input(f"trushell {os.getcwd()} ❯ ").strip()
+    try:
+        try:
+            from prompt_toolkit import prompt as prompt_toolkit_prompt
+        except ImportError:
+            prompt_toolkit_prompt = None
+
+        if prompt_toolkit_prompt is not None:
+            raw_command = prompt_toolkit_prompt(f"trushell {os.getcwd()} ❯ ")
+        else:
+            raw_command = input("trushell> ")
+    except UnicodeEncodeError:
+        raw_command = input("trushell> ")
+
+    raw_command = raw_command.strip()
     command, argument = _split_command(raw_command)
     return raw_command, command, argument
 
@@ -117,20 +134,23 @@ def _run_external_command(
     peak_cpu = 0.0
     start = time.perf_counter()
 
-    while True:
+    try:
+        while True:
+            try:
+                process.wait(timeout=0.05)
+                break
+            except subprocess.TimeoutExpired:
+                if monitor is not None:
+                    try:
+                        peak_rss = max(peak_rss, monitor.memory_info().rss)
+                        peak_cpu = max(peak_cpu, monitor.cpu_percent(None))
+                    except (Exception, OSError):
+                        break
+    finally:
         try:
-            process.wait(timeout=0.05)
-            break
-        except subprocess.TimeoutExpired:
-            if monitor is not None:
-                try:
-                    peak_rss = max(peak_rss, monitor.memory_info().rss)
-                    peak_cpu = max(peak_cpu, monitor.cpu_percent(None))
-                except (Exception, OSError):
-                    break
-
-    if process.returncode is None:
-        process.wait()
+            process.wait()
+        except Exception:
+            pass
 
     if monitor is not None:
         try:
@@ -242,7 +262,7 @@ def _handle_local_command(command: str, argument: str) -> str:
         launch_settings()
         return "handled"
     if command == "help":
-        typer.echo("Available commands: joke, joke_trex, addtask, deletetask, updatetask, completetask, showtask, now, time, world, tz, alarm, sw, settings, exit, help")
+        typer.echo("Available commands: joke, joke_trex, addtask, deletetask, updatetask, completetask, showtasks, now, time, world, tz, alarm, sw, settings, exit, help")
         return "handled"
     return "unhandled"
 
