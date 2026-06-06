@@ -6,10 +6,6 @@ A lightweight, context‑aware shell for developers
 
 ---
 
-TruShell is not a full replacement for bash or zsh. It is a small
-utility shell that sits next to your normal terminal and helps you
-track tasks, check times, set alarms, and run ordinary commands.
-
 It is written in Python and uses a SQLite database for todos.
 When you type a command TruShell does not recognise, it passes it
 directly to the host system’s shell (bash, cmd, etc.).
