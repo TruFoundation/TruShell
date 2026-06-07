@@ -4,8 +4,6 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-
-import typer
 from platformdirs import user_config_dir
 
 
@@ -60,8 +58,11 @@ class StateStore:
             state.z_dirs = file_data.get("z_dirs", {})
         except FileNotFoundError:
             return state
-        except Exception:
-            typer.secho("Unable to load application state. Using defaults.", fg=typer.colors.YELLOW)
+        except Exception as e:
+            print(
+                f"[yellow]Warning: Unable to load application state. "
+                f" Using defaults.{e}[/yellow]"
+            )
             return state
         return state
 
