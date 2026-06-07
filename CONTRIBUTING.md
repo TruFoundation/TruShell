@@ -15,6 +15,38 @@ Thank you for your interest in contributing! This project follows an open and co
 - Use `black` for formatting and `ruff` for linting.
 - Keep logic simple and beginner-friendly.
 
-## Issues
+## Good First Issues
 
+If you are new to the TruFoundation codebase, a great way to get started is by tackling one of our beginner-friendly issues. These tasks are scoped to be low-risk, highly educational, and perfect for your first pull request. 
+Currently, we recommend looking at:
+
+- [Fix Sound Packaging Path in pyproject.toml](https://github.com/TruFoundation/TruShell/issues/31)
+- [Remove Unused typer Dependency from state.py](https://github.com/TruFoundation/TruShell/issues/33)
+- [Add csvview Alias for csv-view Command](https://github.com/TruFoundation/TruShell/issues/32)
+
+## Development Environment Setup
+
+To start contributing safely, you need to set up your local development environment. We strongly recommend isolating your workspace before installing dependencies.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/TruFoundation/TruShell.git
+   cd TruShell
+   ```
+
+2. **Create and activate a virtual environment:**
+   ```
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+3. **Install TruShell in editable mode:**
+
+   ```
+   pip install -e .
+   ```
+4. **Run the test suite:**
+   ```
+   python -m pytest
+    ```
+## Issues
 If you find a bug or want to request a feature, please open an issue with a clear description and reproduction steps.
