@@ -210,7 +210,7 @@ Tests:    pytest tests/
 Version:  kept in sync between trushell/__init__.py and pyproject.toml
 
 To add a custom sound for jokes, put an .mp3 or .wav file into
-trushell/chronoterm/sounds/ – it will appear in the ‘settings’ menu.
+trushell/sounds/ – it will appear in the ‘settings’ menu.
 
 
 License
