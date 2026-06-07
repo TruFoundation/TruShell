@@ -8,7 +8,6 @@ import sys
 import time
 import typer
 from pathlib import Path
-from rich.console import Console
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Header, TextArea
@@ -23,7 +22,6 @@ from . import __version__
 from .core.trukernel import EXIT_SENTINEL, get_kernel
 
 app = typer.Typer(name="trushell", help="TruShell manifest-driven launcher.")
-console = Console()
 
 
 def app_with_lower() -> None:
@@ -290,7 +288,7 @@ def _handle_cd_command(raw_command: str) -> bool:
 
     try:
         os.chdir(target)
-        console.print(f"[green]→ {os.getcwd()}[/green]")
+        typer.echo(f"→ {os.getcwd()}")
     except (FileNotFoundError, NotADirectoryError, PermissionError) as error:
         typer.secho(f"❌ Cannot navigate: {error}", fg=typer.colors.RED)
     except OSError as error:

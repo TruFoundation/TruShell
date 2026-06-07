@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,6 +11,7 @@ from trushell.core.models import Todo
 
 # Global state to track initialization
 _INITIALIZED = False
+_INITIALIZE_LOCK = threading.Lock()
 _DB_PATH: Optional[Path] = None
 
 
@@ -34,27 +36,31 @@ def _ensure_initialized() -> None:
     if _INITIALIZED:
         return
 
-    db_path = _get_db_path()
-    
-    # Open a direct connection to initialize.
-    # We do NOT use get_db_connection() here to avoid recursion.
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """CREATE TABLE IF NOT EXISTS todos (
-                task TEXT,
-                category TEXT,
-                date_added TEXT,
-                date_completed TEXT,
-                status INTEGER,
-                position INTEGER
-            )"""
-        )
-        conn.commit()
-        _INITIALIZED = True
-    finally:
-        conn.close()
+    with _INITIALIZE_LOCK:
+        if _INITIALIZED:
+            return
+
+        db_path = _get_db_path()
+
+        # Open a direct connection to initialize.
+        # We do NOT use get_db_connection() here to avoid recursion.
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS todos (
+                    task TEXT,
+                    category TEXT,
+                    date_added TEXT,
+                    date_completed TEXT,
+                    status INTEGER,
+                    position INTEGER
+                )"""
+            )
+            conn.commit()
+            _INITIALIZED = True
+        finally:
+            conn.close()
 
 
 def get_db_connection() -> sqlite3.Connection:
