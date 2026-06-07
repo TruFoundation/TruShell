@@ -55,7 +55,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 packages = ["trushell"]
-include = ["README.md", "LICENSE", "trushell/chronoterm/sounds/*"]
+include = ["README.md", "LICENSE", "trushell/sounds/*"]
 
 [tool.ruff]
 line-length = 88
