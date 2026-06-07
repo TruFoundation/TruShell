@@ -31,8 +31,7 @@ def app_with_lower() -> None:
     if len(sys.argv) > 1:
         # Create a local copy to avoid mutating the global sys.argv
         argv_copy = sys.argv.copy()
-        argv_copy[1] = argv_copy[1].lower()
-        if argv_copy[1] not in {"--help", "-h", "version"}:
+        if argv_copy[1].lower() not in {"--help", "-h", "version"}:
             raw = " ".join(argv_copy[1:])
             get_kernel().execute_command(raw)
             return

@@ -41,3 +41,11 @@ def test_run_settings_launches_textual_app(monkeypatch):
     run_settings("")
 
     assert called["ran"] is True
+
+def test_switching_categories_retains_dirty_settings(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    app = SettingsApp()
+    app._update_dirty_setting("theme", "light")
+    app.selected_category = "Data"
+    assert "theme" in app.dirty_settings
+    assert app.dirty_settings["theme"] == "light"
