@@ -50,3 +50,57 @@ def test_update_task_multiword_known_bug(monkeypatch) -> None:
     assert captured["task"] == "New"
     # and treats the remainder as the category
     assert captured["category"] == "text"
+
+
+def test_add_task_parses_quoted_category(monkeypatch) -> None:
+    """`task add "<task>" "<category>"` stores the supplied category (gh-46)."""
+    from trushell.commands.tasks import add_task
+
+    captured: dict[str, Any] = {}
+
+    def fake_insert_todo(todo: Any) -> None:
+        captured["task"] = todo.task
+        captured["category"] = todo.category
+
+    monkeypatch.setattr("trushell.commands.tasks.insert_todo", fake_insert_todo)
+
+    add_task('"Buy milk" "Shopping"')
+
+    assert captured["task"] == "Buy milk"
+    assert captured["category"] == "Shopping"
+
+
+def test_add_task_defaults_category_when_omitted(monkeypatch) -> None:
+    """A quoted task with no category falls back to the "General" category."""
+    from trushell.commands.tasks import add_task
+
+    captured: dict[str, Any] = {}
+
+    def fake_insert_todo(todo: Any) -> None:
+        captured["task"] = todo.task
+        captured["category"] = todo.category
+
+    monkeypatch.setattr("trushell.commands.tasks.insert_todo", fake_insert_todo)
+
+    add_task('"Pay rent"')
+
+    assert captured["task"] == "Pay rent"
+    assert captured["category"] == "General"
+
+
+def test_add_task_unquoted_remains_backwards_compatible(monkeypatch) -> None:
+    """Unquoted input keeps the whole remainder as the task text (back-compat)."""
+    from trushell.commands.tasks import add_task
+
+    captured: dict[str, Any] = {}
+
+    def fake_insert_todo(todo: Any) -> None:
+        captured["task"] = todo.task
+        captured["category"] = todo.category
+
+    monkeypatch.setattr("trushell.commands.tasks.insert_todo", fake_insert_todo)
+
+    add_task("buy groceries")
+
+    assert captured["task"] == "buy groceries"
+    assert captured["category"] == "General"
