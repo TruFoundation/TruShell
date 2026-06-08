@@ -260,9 +260,6 @@ def _handle_local_command(command: str, argument: str) -> str:
 
         launch_settings()
         return "handled"
-    if command == "help":
-        typer.echo("Available commands: joke, joke_trex, addtask, deletetask, updatetask, completetask, showtasks, now, time, world, tz, alarm, sw, settings, exit, help")
-        return "handled"
     return "unhandled"
 
 
