@@ -7,13 +7,31 @@ from trushell.core.models import Todo
 
 
 def add_task(args: str) -> None:
-    """Add a new task to the todo list. The full remainder is treated as the task."""
+    """Add a new task to the todo list.
+
+    Supports two formats:
+        addtask "task text" "category"
+        addtask task text here
+    """
     if not args.strip():
-        print("Usage: task add <task>")
+        print("Usage: task add <task> [category]")
         return
 
-    task_text = args.strip()
-    todo = Todo(task=task_text, category="General")
+    # Try to parse quoted arguments: "task text" "category"
+    import shlex
+    try:
+        parts = shlex.split(args)
+    except ValueError:
+        parts = args.strip().split(maxsplit=1)
+
+    if len(parts) >= 2:
+        task_text = parts[0]
+        category = parts[1]
+    else:
+        task_text = parts[0]
+        category = "General"
+
+    todo = Todo(task=task_text, category=category)
     insert_todo(todo)
     print("Task added.")
 

@@ -26,11 +26,11 @@ app = typer.Typer(name="trushell", help="TruShell manifest-driven launcher.")
 
 def app_with_lower() -> None:
     """Entry point that normalizes the first argument to lowercase for case-insensitive invocation."""
-    if len(sys.argv) > 1:
-        # Create a local copy to avoid mutating the global sys.argv
-        argv_copy = sys.argv.copy()
-        if argv_copy[1].lower() not in {"--help", "-h", "version"}:
-            raw = " ".join(argv_copy[1:])
+    # Create a local copy to avoid mutating the global sys.argv
+    argv = sys.argv.copy()
+    if len(argv) > 1:
+        if argv[1].lower() not in {"--help", "-h", "version"}:
+            raw = " ".join(argv[1:]).lower()
             get_kernel().execute_command(raw)
             return
 
@@ -193,7 +193,7 @@ def _handle_todo_command(command: str) -> bool:
     if add_match:
         from trushell.commands.tasks import add_task
 
-        add_task(f"{add_match.group(1)} {add_match.group(2)}")
+        add_task(f'"{add_match.group(1)}" "{add_match.group(2)}"')
         return True
 
     update_match = re.match(r'updatetask\s+(\d+)\s+"([^"]+)"\s+"([^"]+)"', command)
