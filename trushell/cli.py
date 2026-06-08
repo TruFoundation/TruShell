@@ -30,7 +30,12 @@ def app_with_lower() -> None:
         # Create a local copy to avoid mutating the global sys.argv
         argv_copy = sys.argv.copy()
         if argv_copy[1].lower() not in {"--help", "-h", "version"}:
-            raw = " ".join(argv_copy[1:])
+            # Normalize the command name to lowercase for case-insensitive
+            # invocation, but preserve the case of subsequent arguments
+            # (e.g., filenames) which may be case-sensitive.
+            first = argv_copy[1].lower()
+            rest = argv_copy[2:]
+            raw = " ".join([first] + rest)
             get_kernel().execute_command(raw)
             return
 
