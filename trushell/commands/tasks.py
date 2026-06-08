@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Callable
 
 from trushell.core.database import complete_todo, delete_todo, get_all_todos, insert_todo, update_todo
@@ -7,13 +8,32 @@ from trushell.core.models import Todo
 
 
 def add_task(args: str) -> None:
-    """Add a new task to the todo list. The full remainder is treated as the task."""
-    if not args.strip():
-        print("Usage: task add <task>")
+    """Add a new task to the todo list.
+
+    Accepts an optional quoted category, mirroring ``update_task`` and the
+    documented ``addtask "<task>" "<category>"`` syntax::
+
+        task add "Buy milk" "Shopping"   -> task="Buy milk", category="Shopping"
+        task add "Buy milk"              -> task="Buy milk", category="General"
+        task add Buy milk                -> task="Buy milk", category="General"
+
+    When no category is supplied the task falls back to the "General" category,
+    preserving the previous default behaviour.
+    """
+    text = args.strip()
+    if not text:
+        print('Usage: task add "<task>" ["<category>"]')
         return
 
-    task_text = args.strip()
-    todo = Todo(task=task_text, category="General")
+    match = re.fullmatch(r'"([^"]+)"(?:\s+"([^"]*)")?', text)
+    if match:
+        task_text = match.group(1)
+        category = match.group(2) or "General"
+    else:
+        task_text = text
+        category = "General"
+
+    todo = Todo(task=task_text, category=category)
     insert_todo(todo)
     print("Task added.")
 
