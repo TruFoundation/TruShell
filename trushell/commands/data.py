@@ -17,11 +17,17 @@ def _render_markup_message(message: str) -> str:
 
 def run_csv_view(args: str) -> str:
     """Render a CSV file as a Rich table."""
-    arguments = shlex.split(args or "")
+    raw_args = args or ""
+    arguments = shlex.split(raw_args)
     if not arguments:
         return _render_markup_message("[red]Error: No file specified.[/red]")
 
     file_path = Path(arguments[0]).expanduser()
+    if not file_path.exists() and "\\" in raw_args:
+        windows_arguments = shlex.split(raw_args, posix=False)
+        if windows_arguments:
+            file_path = Path(windows_arguments[0].strip("\"'")).expanduser()
+
     if not file_path.exists():
         return _render_markup_message(f"[red]Error: File '{file_path}' not found.[/red]")
 
