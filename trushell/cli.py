@@ -195,7 +195,7 @@ def _handle_todo_command(command: str) -> bool:
     if add_match:
         from trushell.commands.tasks import add_task
 
-        add_task(f"{add_match.group(1)} {add_match.group(2)}")
+        add_task(f'"{add_match.group(1)}" "{add_match.group(2)}"')
         return True
 
     update_match = re.match(r'updatetask\s+(\d+)\s+"([^"]+)"\s+"([^"]+)"', command)
