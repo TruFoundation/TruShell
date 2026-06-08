@@ -25,3 +25,16 @@ def test_handle_cd_command_changes_directory(tmp_path, monkeypatch, capsys):
     assert Path.cwd() == target
     assert not called
     assert str(target) in capsys.readouterr().out
+
+
+def test_handle_cd_command_expands_environment_variables(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "env-target"
+    target.mkdir()
+    monkeypatch.setenv("TRUSHELL_CD_TARGET", str(target))
+
+    result = cli._handle_cd_command("cd $TRUSHELL_CD_TARGET")
+
+    assert result is True
+    assert Path.cwd() == target
+    assert str(target) in capsys.readouterr().out

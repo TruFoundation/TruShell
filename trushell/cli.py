@@ -283,7 +283,7 @@ def _handle_cd_command(raw_command: str) -> bool:
         typer.secho("Syntax: cd <directory_path>", fg=typer.colors.YELLOW)
         return True
 
-    target = os.path.expanduser(argument)
+    target = os.path.expandvars(os.path.expanduser(argument))
 
     try:
         os.chdir(target)
