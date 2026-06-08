@@ -25,9 +25,8 @@ app = typer.Typer(name="trushell", help="TruShell manifest-driven launcher.")
 
 
 def app_with_lower() -> None:
-    """Entry point that normalizes the first argument to lowercase for case-insensitive invocation."""
+    """Normalize command names without changing the caller's argument list."""
     if len(sys.argv) > 1:
-        # Create a local copy to avoid mutating the global sys.argv
         argv_copy = sys.argv.copy()
         if argv_copy[1].lower() not in {"--help", "-h", "version"}:
             # Normalize the command name to lowercase for case-insensitive
@@ -39,8 +38,6 @@ def app_with_lower() -> None:
             get_kernel().execute_command(raw)
             return
 
-    if argv != sys.argv:
-        sys.argv = argv
     app()
 
 
