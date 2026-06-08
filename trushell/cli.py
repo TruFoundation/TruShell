@@ -25,9 +25,8 @@ app = typer.Typer(name="trushell", help="TruShell manifest-driven launcher.")
 
 
 def app_with_lower() -> None:
-    """Entry point that normalizes the first argument to lowercase for case-insensitive invocation."""
+    """Normalize command names without changing the caller's argument list."""
     if len(sys.argv) > 1:
-        # Create a local copy to avoid mutating the global sys.argv
         argv_copy = sys.argv.copy()
         if argv_copy[1].lower() not in {"--help", "-h", "version"}:
             # Normalize the command name to lowercase for case-insensitive
@@ -39,8 +38,6 @@ def app_with_lower() -> None:
             get_kernel().execute_command(raw)
             return
 
-    if argv != sys.argv:
-        sys.argv = argv
     app()
 
 
@@ -119,7 +116,7 @@ class TruShellEditor(App):
 
 
 def _run_external_command(
-    command: str,
+    command: str | list[str],
     shell: bool = True,
     check: bool = False,
     cwd: str | None = None,
@@ -307,8 +304,13 @@ def _handle_os_fallback(raw_command: str) -> bool:
         return False
 
     try:
-        completed = _run_external_command(command, shell=True, check=False, cwd=os.getcwd())
-    except (OSError, subprocess.SubprocessError) as error:
+        completed = _run_external_command(
+            shlex.split(command),
+            shell=False,
+            check=False,
+            cwd=os.getcwd(),
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
         typer.secho("❓ Command not recognized by TruShell or your host OS.", fg=typer.colors.YELLOW)
         typer.secho(f"OS fallback error: {error}", fg=typer.colors.RED)
         return True
