@@ -36,8 +36,7 @@ def run_csv_view(args: str) -> str:
                 dialect = csv.Sniffer().sniff(sample, delimiters=",\t")
             except csv.Error:
                 delimiter = "\t" if "\t" in sample else ","
-                dialect = csv.get_dialect("excel")
-                dialect.delimiter = delimiter
+                dialect = csv.excel_tab if delimiter == "\t" else csv.excel
 
             reader = csv.reader(handle, dialect)
             headers = next(reader, None)

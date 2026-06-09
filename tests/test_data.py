@@ -39,3 +39,26 @@ def test_run_csv_view_shows_limited_rows(tmp_path: Path) -> None:
     assert "User 50" in output
     assert "User 51" not in output
     assert "...and 3 more rows" in output
+
+
+def test_run_csv_view_short_rows_are_padded(tmp_path: Path) -> None:
+    """Ensure ragged rows are padded with empty cells.
+
+    Use quoted fields so csv.Sniffer has sufficient signal to detect
+    the delimiter reliably on small samples.
+    """
+    from trushell.commands.data import run_csv_view
+
+    file_path = tmp_path / "short_rows.csv"
+    rows = ['"A","B","C"', '"1","2"', '"3","4","5"']
+    file_path.write_text("\n".join(rows), encoding="utf-8")
+
+    output = _strip_ansi(run_csv_view(str(file_path)))
+
+    assert "A" in output
+    assert "B" in output
+    assert "C" in output
+    assert "1" in output
+    assert "3" in output
+    # There should be at least one empty/padded cell visible in output
+    assert "  " in output
