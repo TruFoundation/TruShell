@@ -12,25 +12,30 @@ def add_task(args: str) -> None:
     """Add a new task to the todo list.
 
     Supports two formats:
-        addtask "task text" "category"
-        addtask task text here
+        addtask "task text" "category"   — explicit quotes
+        addtask task text here            — entire text is the task
     """
     if not args.strip():
         typer.secho('⚠️ Missing arguments. Syntax: addtask "task-name" "category"', fg=typer.colors.YELLOW)
         return
 
-    # Try to parse quoted arguments: "task text" "category"
+    # Only parse as "task" "category" when the user explicitly used quotes.
+    # Otherwise treat the entire args as the task text.
     import shlex
-    try:
-        parts = shlex.split(args)
-    except ValueError:
-        parts = args.strip().split(maxsplit=1)
-
-    if len(parts) >= 2:
-        task_text = parts[0]
-        category = parts[1]
+    stripped = args.strip()
+    if stripped.startswith('"') or stripped.startswith("'"):
+        try:
+            parts = shlex.split(stripped)
+        except ValueError:
+            parts = None
+        if parts and len(parts) >= 2:
+            task_text = parts[0]
+            category = parts[1]
+        else:
+            task_text = stripped.strip('"').strip("'")
+            category = "General"
     else:
-        task_text = parts[0]
+        task_text = stripped
         category = "General"
 
     todo = Todo(task=task_text, category=category)
