@@ -35,10 +35,10 @@ dependencies = [
 ]
 
 [project.urls]
-Home = "https://github.com/AkshajSinghal/TruShell"
-Repository = "https://github.com/AkshajSinghal/TruShell"
-Documentation = "https://github.com/AkshajSinghal/TruShell#readme"
-"Bug Tracker" = "https://github.com/AkshajSinghal/TruShell/issues"
+Home = "https://github.com/TruFoundation/TruShell"
+Repository = "https://github.com/TruFoundation/TruShell"
+Documentation = "https://github.com/TruFoundation/TruShell#readme"
+"Bug Tracker" = "https://github.com/TruFoundation/TruShell/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0", "ruff>=0.0.280", "black>=24.10.0"]
