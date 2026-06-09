@@ -24,7 +24,7 @@ def test_run_jump_single_match(tmp_path, monkeypatch):
     assert result == f"__TRUSHELL_CD__: {target}"
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Windows backslash escaping in Rich table output breaks path assertion")
+@pytest.mark.skipif(sys.platform == "win32", reason="Rich table renders Windows paths with escaped backslashes, breaking cross-platform path comparison")
 def test_run_jump_multiple_matches(tmp_path, monkeypatch):
     first = tmp_path / "src"
     first.mkdir()

@@ -16,7 +16,7 @@ def test_run_csv_view_file_not_found() -> None:
     assert "not found." in output
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Windows path formatting breaks tmp_path assertions")
+@pytest.mark.skipif(sys.platform == "win32", reason="shlex.split() mangles Windows backslash paths, causing file-not-found errors")
 def test_run_csv_view_empty_file(tmp_path: Path) -> None:
     from trushell.commands.data import run_csv_view
 
@@ -27,7 +27,7 @@ def test_run_csv_view_empty_file(tmp_path: Path) -> None:
     assert "Warning: File is empty." in output
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Windows path formatting breaks tmp_path assertions")
+@pytest.mark.skipif(sys.platform == "win32", reason="shlex.split() mangles Windows backslash paths, causing file-not-found errors")
 def test_run_csv_view_shows_limited_rows(tmp_path: Path) -> None:
     from trushell.commands.data import run_csv_view
 
@@ -46,7 +46,7 @@ def test_run_csv_view_shows_limited_rows(tmp_path: Path) -> None:
     assert "...and 3 more rows" in output
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Windows path formatting breaks tmp_path assertions")
+@pytest.mark.skipif(sys.platform == "win32", reason="shlex.split() mangles Windows backslash paths, causing file-not-found errors")
 def test_run_csv_view_short_rows_are_padded(tmp_path: Path) -> None:
     """Ensure ragged rows are padded with empty cells.
 
