@@ -29,9 +29,6 @@ def app_with_lower() -> None:
     if len(sys.argv) > 1:
         argv_copy = sys.argv.copy()
         if argv_copy[1].lower() not in {"--help", "-h", "version"}:
-            # Normalize the command name to lowercase for case-insensitive
-            # invocation, but preserve the case of subsequent arguments
-            # (e.g., filenames) which may be case-sensitive.
             first = argv_copy[1].lower()
             rest = argv_copy[2:]
             raw = " ".join([first] + rest)
