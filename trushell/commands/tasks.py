@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+import typer
+
 from trushell.core.database import complete_todo, delete_todo, get_all_todos, insert_todo, update_todo
 from trushell.core.models import Todo
 
@@ -14,7 +16,7 @@ def add_task(args: str) -> None:
         addtask task text here
     """
     if not args.strip():
-        print("Usage: task add <task> [category]")
+        typer.secho('⚠️ Missing arguments. Syntax: addtask "task-name" "category"', fg=typer.colors.YELLOW)
         return
 
     # Try to parse quoted arguments: "task text" "category"
@@ -33,54 +35,54 @@ def add_task(args: str) -> None:
 
     todo = Todo(task=task_text, category=category)
     insert_todo(todo)
-    print("Task added.")
+    typer.secho("✅ Task added.", fg=typer.colors.GREEN)
 
 
 def show_tasks(_: str) -> None:
     """Display the current todo list."""
     tasks = get_all_todos()
     if not tasks:
-        print("No tasks found.")
+        typer.echo("No tasks found.")
         return
 
     for index, task in enumerate(tasks, start=1):
         status = "✅" if task.status == 2 else "❌"
-        print(f"{index}. {task.task} [{task.category}] {status}")
+        typer.echo(f"{index}. {task.task} [{task.category}] {status}")
 
 
 def complete_task(args: str) -> None:
     """Mark a todo item as complete."""
     if not args.strip() or not args.strip().isdigit():
-        print("Usage: task done <task-number>")
+        typer.secho("⚠️ Usage: task done <task-number>", fg=typer.colors.YELLOW)
         return
 
     index = int(args.strip()) - 1
     try:
         complete_todo(index)
-        print("Task completed.")
+        typer.secho("✅ Task completed.", fg=typer.colors.GREEN)
     except Exception as error:
-        print(f"Task error: {error}")
+        typer.secho(f"❌ Task error: {error}", fg=typer.colors.RED)
 
 
 def remove_task(args: str) -> None:
     """Remove a task by its numeric position."""
     if not args.strip() or not args.strip().isdigit():
-        print("Usage: task remove <task-number>")
+        typer.secho("⚠️ Usage: task remove <task-number>", fg=typer.colors.YELLOW)
         return
 
     index = int(args.strip()) - 1
     try:
         delete_todo(index)
-        print("Task removed.")
+        typer.secho("✅ Task removed.", fg=typer.colors.GREEN)
     except Exception as error:
-        print(f"Task error: {error}")
+        typer.secho(f"❌ Task error: {error}", fg=typer.colors.RED)
 
 
 def update_task(args: str) -> None:
     """Update an existing task's text and/or category."""
     parts = args.split(maxsplit=2)
     if len(parts) < 2 or not parts[0].isdigit():
-        print('Usage: task update <task-number> "<task>" ["<category>"]')
+        typer.secho('⚠️ Usage: task update <task-number> "<task>" ["<category>"]', fg=typer.colors.YELLOW)
         return
 
     index = int(parts[0]) - 1
@@ -89,9 +91,9 @@ def update_task(args: str) -> None:
 
     try:
         update_todo(index, task_text, category)
-        print("Task updated.")
+        typer.secho("✅ Task updated.", fg=typer.colors.GREEN)
     except Exception as error:
-        print(f"Task error: {error}")
+        typer.secho(f"❌ Task error: {error}", fg=typer.colors.RED)
 
 
 def list_tasks(_: str) -> None:
@@ -112,7 +114,7 @@ def run_task_command(args: str) -> None:
     }
 
     if not args.strip():
-        print("Usage: task <add|show|done|list|remove|update> [options]")
+        typer.secho("⚠️ Usage: task <add|show|done|list|remove|update> [options]", fg=typer.colors.YELLOW)
         return
 
     parts = args.split(maxsplit=1)
@@ -124,6 +126,6 @@ def run_task_command(args: str) -> None:
         try:
             handler(subargs)
         except Exception as error:
-            print(f"Task error: {error}")
+            typer.secho(f"❌ Task error: {error}", fg=typer.colors.RED)
     else:
-        print(f"Unknown task subcommand: {subcmd}")
+        typer.secho(f"❓ Unknown task subcommand: {subcmd}", fg=typer.colors.YELLOW)
