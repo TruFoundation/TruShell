@@ -100,3 +100,19 @@ def test_run_csv_view_handles_unquoted_windows_paths(tmp_path: Path) -> None:
     assert "User 51" not in output
     assert "...and 1 more" in output
     assert "rows" in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows path with spaces regression")
+def test_run_csv_view_handles_windows_paths_with_spaces(tmp_path: Path) -> None:
+    from trushell.commands.data import run_csv_view
+
+    directory = tmp_path / "Program Files"
+    directory.mkdir()
+    file_path = directory / "users.csv"
+    file_path.write_text("ID,Name\n1,Ada\n", encoding="utf-8")
+
+    output = _strip_ansi(run_csv_view(str(file_path)))
+
+    assert "ID" in output
+    assert "Name" in output
+    assert "Ada" in output
