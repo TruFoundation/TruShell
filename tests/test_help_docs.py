@@ -21,6 +21,15 @@ def test_run_help_prints_docstring_for_known_command(monkeypatch, capsys):
         _import_module=_fake_import_module,
     )
 
+    # Provide a minimal module object with the expected function and
+    # docstring so `run_help()` can import and print the docstring.
+    def run_settings():
+        """Launch the TruShell settings TUI."""
+        return None
+
+    fake_module = SimpleNamespace(run_settings=run_settings)
+    fake_kernel._import_module = lambda path: fake_module
+
     monkeypatch.setattr("trushell.core.trukernel.get_kernel", lambda: fake_kernel)
 
     run_help("settings")
