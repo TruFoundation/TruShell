@@ -46,6 +46,7 @@ def test_run_csv_view_shows_limited_rows(tmp_path: Path) -> None:
     assert "...and 3 more rows" in output
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows path formatting breaks tmp_path assertions")
 def test_run_csv_view_short_rows_are_padded(tmp_path: Path) -> None:
     """Ensure ragged rows are padded with empty cells.
 
