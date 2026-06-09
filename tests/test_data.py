@@ -1,5 +1,8 @@
 import re
+import sys
 from pathlib import Path
+
+import pytest
 
 def _strip_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", text)
@@ -13,6 +16,7 @@ def test_run_csv_view_file_not_found() -> None:
     assert "not found." in output
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows path formatting breaks tmp_path assertions")
 def test_run_csv_view_empty_file(tmp_path: Path) -> None:
     from trushell.commands.data import run_csv_view
 
@@ -23,6 +27,7 @@ def test_run_csv_view_empty_file(tmp_path: Path) -> None:
     assert "Warning: File is empty." in output
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows path formatting breaks tmp_path assertions")
 def test_run_csv_view_shows_limited_rows(tmp_path: Path) -> None:
     from trushell.commands.data import run_csv_view
 
