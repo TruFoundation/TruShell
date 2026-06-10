@@ -167,15 +167,11 @@ class SettingsApp(App):
                 Input(value=str(self.dirty_settings.get("prompt_symbol", self.settings.get("prompt_symbol", "➜"))), id="prompt_symbol"),
             )
         elif current_cat == "Appearance":
-            add_field(
-                "Theme:",
-                Select(
-                    options=self.THEME_OPTIONS,
-                    value=str(self.dirty_settings.get("theme", self.settings.get("theme", "dark"))),
-                    id="theme_selector",
-                ),
+            select_widget = Select(
+                options=self.THEME_OPTIONS,
+                value=str(self.dirty_settings.get("theme", self.settings.get("theme", "dark"))),
+                id="theme_selector",
             )
-            select_widget.watch_value(lambda value: self._track_change("theme", value))
             add_field("Theme:", select_widget)
         elif current_cat == "Navigation":
             add_field(
