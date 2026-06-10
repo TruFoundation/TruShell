@@ -49,3 +49,19 @@ def test_switching_categories_retains_dirty_settings(tmp_path, monkeypatch):
     app.selected_category = "Data"
     assert "theme" in app.dirty_settings
     assert app.dirty_settings["theme"] == "light"
+
+
+def test_dirty_settings_seeded_from_loaded_settings(tmp_path, monkeypatch):
+    # Regression: __init__ used to overwrite `dirty_settings` with an empty
+    # dict immediately after seeding it from `self.settings`, which silently
+    # discarded any persisted values before the UI rendered.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    app = SettingsApp()
+    assert app.dirty_settings == app.settings
+    assert app.dirty_settings == {
+        "theme": "dark",
+        "prompt_symbol": "➜",
+        "show_git_status": True,
+        "auto_complete": True,
+        "csv_max_rows": 50,
+    }
