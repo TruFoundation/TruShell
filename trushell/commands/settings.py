@@ -74,10 +74,9 @@ class SettingsApp(App):
         super().__init__(**kwargs)
         self.manager = SettingsManager()
         self.settings = self.manager.load()
+        # Track changes to settings without losing data when switching categories
         self.dirty_settings = dict(self.settings)
         self.selected_category = "General"
-        # Track changes to settings without losing data when switching categories
-        self.dirty_settings: dict = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
