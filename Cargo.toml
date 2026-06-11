@@ -1,0 +1,8 @@
+[package]
+name = "trushell"
+version = "0.1.0"
+edition = "2021"
+authors = ["TruFoundation <noreply@trufoundation.org>"]
+
+[dependencies]
+crossterm = "0.27"
