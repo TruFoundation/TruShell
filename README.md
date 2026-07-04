@@ -4,7 +4,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/trushell.svg)](https://pypi.org/project/trushell/)
 
-**TruShell** is a lightweight, context-aware productivity shell for developers. Written in Python, it blends a powerful interactive REPL with built-in tools for task management, time tracking, data visualization, and system navigation. When you type a command TruShell doesn’t recognize, it seamlessly passes it to your host system’s shell (bash, zsh, cmd, etc.), making it a frictionless drop-in replacement for your daily terminal workflow.
+**TruShell** is a lightweight, productivity shell for developers. Written in Python, it blends a powerful interactive REPL with built-in tools for task management, time tracking, data visualization, and system navigation. When you type a command TruShell doesn’t recognize, it seamlessly passes it to your host system’s shell (bash, zsh, cmd, etc.), making it a frictionless drop-in replacement for your daily terminal workflow.
 
 ## Features
 
