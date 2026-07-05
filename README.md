@@ -1,4 +1,5 @@
-# TruShell — A Productivity Shell for Task Tracking and Time Management
+# 🐄 TruShell 
+A Productivity Shell for Task Tracking and Time Management
 
 **TruShell** is an interactive shell environment designed to integrate task tracking and time management tools seamlessly with traditional terminal commands. Built in Rust with a custom expression parser, TruShell extends the Unix philosophy by providing a unified interface where productivity features and system commands coexist naturally.
 
