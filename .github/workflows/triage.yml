@@ -1,0 +1,41 @@
+name: pr-triage
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Triage PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const authorAssoc = pr.author_association;
+            const login = pr.user.login || '';
+            const isBot = pr.user.type === 'Bot' || /bot$/i.test(login);
+            const labels = [];
+            if (authorAssoc === 'FIRST_TIME_CONTRIBUTOR' || authorAssoc === 'NONE') {
+              labels.push('first-timers');
+            }
+            if (isBot) {
+              labels.push('bot');
+            }
+            if (labels.length) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels,
+              });
+            }
+            // Ensure review requirement for first-time contributors
+            if (labels.includes('first-timers')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['needs-human-review'],
+              });
+            }
