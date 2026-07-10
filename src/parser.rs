@@ -7,9 +7,11 @@ pub enum Token {
     Let,
     Flag(String),
     Identifier(String),
+    Word(String),
     Number(String),
     StringLiteral(String),
     Boolean(bool),
+    Fd(u8),
     Equals,
     Pipe,
     LParen,
@@ -20,11 +22,14 @@ pub enum Token {
     Comma,
     Semicolon,
     GreaterThan,
+    AppendGreaterThan,
     LessThan,
+    LessThanLessThan,
     GreaterThanOrEqual,
     LessThanOrEqual,
     EqualsEquals,
     BangEquals,
+    CombinedRedirect,
     Plus,
     Minus,
     Star,
@@ -53,6 +58,17 @@ pub enum BinaryOperator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum RedirectMode {
+    Truncate,
+    Append,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RedirectTarget {
+    File(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ASTNode {
     Let {
         name: String,
@@ -64,6 +80,13 @@ pub enum ASTNode {
     Command {
         name: String,
         args: Vec<ASTNode>,
+    },
+    Redirect {
+        source: Box<ASTNode>,
+        fd: u8,
+        mode: RedirectMode,
+        target: RedirectTarget,
+        merge_stderr: bool,
     },
     Block {
         body: Vec<ASTNode>,
@@ -103,11 +126,13 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-pub fn tokenize_line(input: &str) -> Result<Vec<Token>, ParseError> {
+type Result<T> = std::result::Result<T, ParseError>;
+
+pub fn tokenize_line(input: &str) -> Result<Vec<Token>> {
     Lexer::new(input).tokenize()
 }
 
-pub fn parse_line(input: &str) -> Result<ASTNode, ParseError> {
+pub fn parse_line(input: &str) -> Result<ASTNode> {
     let tokens = tokenize_line(input)?;
     let mut parser = Parser::new(tokens);
     let node = parser.parse_statement()?;
@@ -130,7 +155,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn tokenize(mut self) -> Result<Vec<Token>, ParseError> {
+    fn tokenize(mut self) -> Result<Vec<Token>> {
         let mut tokens = Vec::new();
 
         while let Some(&ch) = self.chars.peek() {
@@ -142,7 +167,16 @@ impl<'a> Lexer<'a> {
                     tokens.push(self.lex_identifier_or_keyword()?);
                 }
                 '0'..='9' => {
-                    tokens.push(self.lex_number()?);
+                    tokens.extend(self.lex_number_or_fd()?);
+                }
+                '&' => {
+                    self.chars.next();
+                    if matches!(self.chars.peek(), Some('>')) {
+                        self.chars.next();
+                        tokens.push(Token::CombinedRedirect);
+                    } else {
+                        return Err(ParseError::new("Unexpected '&' without redirect"));
+                    }
                 }
                 '"' => {
                     tokens.push(self.lex_string()?);
@@ -190,18 +224,18 @@ impl<'a> Lexer<'a> {
                 }
                 '>' => {
                     self.chars.next();
-                    if matches!(self.chars.peek(), Some('=')) {
+                    if matches!(self.chars.peek(), Some('>')) {
                         self.chars.next();
-                        tokens.push(Token::GreaterThanOrEqual);
+                        tokens.push(Token::AppendGreaterThan);
                     } else {
                         tokens.push(Token::GreaterThan);
                     }
                 }
                 '<' => {
                     self.chars.next();
-                    if matches!(self.chars.peek(), Some('=')) {
+                    if matches!(self.chars.peek(), Some('<')) {
                         self.chars.next();
-                        tokens.push(Token::LessThanOrEqual);
+                        tokens.push(Token::LessThanLessThan);
                     } else {
                         tokens.push(Token::LessThan);
                     }
@@ -247,8 +281,8 @@ impl<'a> Lexer<'a> {
                     self.chars.next();
                     tokens.push(Token::Slash);
                 }
-                other => {
-                    return Err(ParseError::new(format!("Unexpected character: '{}'", other)));
+                _other => {
+                    tokens.push(self.lex_word()?);
                 }
             }
         }
@@ -256,7 +290,7 @@ impl<'a> Lexer<'a> {
         Ok(tokens)
     }
 
-    fn lex_identifier_or_keyword(&mut self) -> Result<Token, ParseError> {
+    fn lex_identifier_or_keyword(&mut self) -> Result<Token> {
         let mut text = String::new();
 
         while let Some(&ch) = self.chars.peek() {
@@ -278,7 +312,7 @@ impl<'a> Lexer<'a> {
         Ok(token)
     }
 
-    fn lex_flag(&mut self) -> Result<Token, ParseError> {
+    fn lex_flag(&mut self) -> Result<Token> {
         let mut text = String::new();
         // consume the leading '-'
         if let Some(ch) = self.chars.next() {
@@ -308,35 +342,62 @@ impl<'a> Lexer<'a> {
         Ok(Token::Flag(text))
     }
 
-    fn lex_number(&mut self) -> Result<Token, ParseError> {
-        let mut text = String::new();
+    fn lex_number_or_fd(&mut self) -> Result<Vec<Token>> {
+        let mut digits = String::new();
 
         while let Some(&ch) = self.chars.peek() {
             if ch.is_ascii_digit() {
-                text.push(ch);
+                digits.push(ch);
                 self.chars.next();
             } else {
                 break;
             }
         }
 
-        while let Some(&ch) = self.chars.peek() {
-            if ch.is_ascii_alphabetic() {
-                text.push(ch);
-                self.chars.next();
-            } else {
-                break;
-            }
-        }
-
-        if text.is_empty() {
+        if digits.is_empty() {
             return Err(ParseError::new("Expected number literal"));
         }
 
-        Ok(Token::Number(text))
+        if matches!(self.chars.peek(), Some(&'>')) || matches!(self.chars.peek(), Some(&'<')) {
+            let fd_value = digits.parse::<u8>().map_err(|_| ParseError::new("Invalid file descriptor"))?;
+            return Ok(vec![Token::Fd(fd_value)]);
+        }
+
+        let mut text = digits;
+        while let Some(&ch) = self.chars.peek() {
+            if ch.is_ascii_alphanumeric() {
+                text.push(ch);
+                self.chars.next();
+            } else {
+                break;
+            }
+        }
+
+        Ok(vec![Token::Number(text)])
     }
 
-    fn lex_string(&mut self) -> Result<Token, ParseError> {
+    fn lex_word(&mut self) -> Result<Token> {
+        let mut value = String::new();
+
+        while let Some(&ch) = self.chars.peek() {
+            if ch.is_whitespace()
+                || matches!(ch, '|' | '<' | '>' | '&' | '(' | ')' | '{' | '}' | ',' | ';' | '=' | '+' | '-' | '*' | '/')
+            {
+                break;
+            }
+
+            value.push(ch);
+            self.chars.next();
+        }
+
+        if value.is_empty() {
+            return Err(ParseError::new("Unexpected invalid word"));
+        }
+
+        Ok(Token::Word(value))
+    }
+
+    fn lex_string(&mut self) -> Result<Token> {
         self.chars.next();
         let mut value = String::new();
 
@@ -373,7 +434,7 @@ impl Parser {
         token
     }
 
-    fn expect_identifier(&mut self) -> Result<String, ParseError> {
+    fn expect_identifier(&mut self) -> Result<String> {
         match self.next() {
             Some(Token::Identifier(name)) => Ok(name.clone()),
             Some(other) => Err(ParseError::new(format!("Expected identifier, found {:?}", other))),
@@ -381,7 +442,7 @@ impl Parser {
         }
     }
 
-    fn expect_token(&mut self, expected: Token) -> Result<(), ParseError>
+    fn expect_token(&mut self, expected: Token) -> Result<()> 
     where
         Token: PartialEq,
     {
@@ -392,7 +453,7 @@ impl Parser {
         }
     }
 
-    fn parse_statement(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_statement(&mut self) -> Result<ASTNode> {
         if matches!(self.peek(), Some(Token::Let)) {
             self.parse_let_statement()
         } else {
@@ -400,7 +461,7 @@ impl Parser {
         }
     }
 
-    fn parse_let_statement(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_let_statement(&mut self) -> Result<ASTNode> {
         self.next();
         let name = self.expect_identifier()?;
         self.expect_token(Token::Equals)?;
@@ -411,7 +472,7 @@ impl Parser {
         })
     }
 
-    fn parse_pipeline(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_pipeline(&mut self) -> Result<ASTNode> {
         let mut stages = vec![Box::new(self.parse_expression()?)];
 
         while matches!(self.peek(), Some(Token::Pipe)) {
@@ -426,11 +487,31 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self) -> Result<ASTNode, ParseError> {
-        self.parse_comparison()
+    fn parse_expression(&mut self) -> Result<ASTNode> {
+        let node = self.parse_comparison()?;
+        self.parse_command_chain(node)
     }
 
-    fn parse_comparison(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_command_chain(&mut self, node: ASTNode) -> Result<ASTNode> {
+        let node = match node {
+            ASTNode::Identifier(name) if self.peek_is_command_token() => {
+                self.parse_command_from_name(name)?
+            }
+            ASTNode::Identifier(name) if self.peek_is_end_of_command() => ASTNode::Command {
+                name,
+                args: Vec::new(),
+            },
+            other => other,
+        };
+
+        if self.peek_redirect_start() {
+            self.parse_redirect(node)
+        } else {
+            Ok(node)
+        }
+    }
+
+    fn parse_comparison(&mut self) -> Result<ASTNode> {
         let mut left = self.parse_term()?;
 
         while let Some(op) = self.peek_comparison_operator() {
@@ -458,7 +539,7 @@ impl Parser {
         }
     }
 
-    fn parse_term(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_term(&mut self) -> Result<ASTNode> {
         let mut node = self.parse_factor()?;
 
         while let Some(op) = self.peek_term_operator() {
@@ -482,7 +563,7 @@ impl Parser {
         }
     }
 
-    fn parse_factor(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_factor(&mut self) -> Result<ASTNode> {
         let mut node = self.parse_primary()?;
 
         while let Some(op) = self.peek_factor_operator() {
@@ -506,12 +587,11 @@ impl Parser {
         }
     }
 
-    fn parse_primary(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_primary(&mut self) -> Result<ASTNode> {
         let token = self.next().cloned();
 
         match token {
-            Some(Token::Identifier(name)) => self.parse_identifier_expression(name),
-            Some(Token::Number(number)) => Ok(ASTNode::Literal(self.parse_number_literal(&number)?)),
+            Some(Token::Identifier(name)) => self.parse_identifier_expression(name),            Some(Token::Word(name)) => self.parse_identifier_expression(name),            Some(Token::Number(number)) => Ok(ASTNode::Literal(self.parse_number_literal(&number)?)),
             Some(Token::StringLiteral(text)) => Ok(ASTNode::Literal(Literal::String(text))),
             Some(Token::Flag(flag)) => Ok(ASTNode::Literal(Literal::String(flag))),
             Some(Token::Boolean(b)) => Ok(ASTNode::Literal(Literal::Boolean(b))),
@@ -526,7 +606,7 @@ impl Parser {
         }
     }
 
-    fn parse_identifier_expression(&mut self, name: String) -> Result<ASTNode, ParseError> {
+    fn parse_identifier_expression(&mut self, name: String) -> Result<ASTNode> {
         let mut expression = if name.starts_with('$') {
             ASTNode::Variable(name.clone())
         } else {
@@ -560,7 +640,7 @@ impl Parser {
         Ok(expression)
     }
 
-    fn parse_call(&mut self, name: String) -> Result<ASTNode, ParseError> {
+    fn parse_call(&mut self, name: String) -> Result<ASTNode> {
         self.expect_token(Token::LParen)?;
         let mut args = Vec::new();
 
@@ -578,7 +658,7 @@ impl Parser {
         Ok(ASTNode::Command { name, args })
     }
 
-    fn parse_block(&mut self) -> Result<ASTNode, ParseError> {
+    fn parse_block(&mut self) -> Result<ASTNode> {
         let mut body = Vec::new();
         self.expect_token(Token::LBrace)?;
 
@@ -596,7 +676,7 @@ impl Parser {
         Ok(ASTNode::Block { body })
     }
 
-    fn parse_number_literal(&self, raw: &str) -> Result<Literal, ParseError> {
+    fn parse_number_literal(&self, raw: &str) -> Result<Literal> {
         let digits: String = raw.chars().take_while(|ch| ch.is_ascii_digit()).collect();
         let unit: String = raw.chars().skip_while(|ch| ch.is_ascii_digit()).collect();
 
@@ -608,6 +688,115 @@ impl Parser {
         let unit = if unit.is_empty() { None } else { Some(unit) };
 
         Ok(Literal::Number { value, unit })
+    }
+
+    fn peek_is_command_token(&self) -> bool {
+        matches!(self.peek(), Some(Token::Identifier(_)) | Some(Token::Word(_)))
+    }
+
+    fn peek_is_end_of_command(&self) -> bool {
+        matches!(self.peek(), Some(Token::Pipe)
+            | Some(Token::RParen)
+            | Some(Token::RBrace)
+            | Some(Token::Comma)
+            | Some(Token::Semicolon)
+            | Some(Token::GreaterThan)
+            | Some(Token::AppendGreaterThan)
+            | Some(Token::LessThan)
+            | Some(Token::CombinedRedirect)
+            | Some(Token::Fd(_)))
+    }
+
+    fn parse_command_from_name(&mut self, name: String) -> Result<ASTNode> {
+        let mut args = Vec::new();
+
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token::Word(text) => {
+                    self.next();
+                    args.push(ASTNode::Literal(Literal::String(text)));
+                }
+                Token::Identifier(text) => {
+                    self.next();
+                    args.push(ASTNode::Literal(Literal::String(text)));
+                }
+                Token::Flag(text) => {
+                    self.next();
+                    args.push(ASTNode::Literal(Literal::String(text)));
+                }
+                Token::StringLiteral(text) => {
+                    self.next();
+                    args.push(ASTNode::Literal(Literal::String(text)));
+                }
+                Token::Number(text) => {
+                    self.next();
+                    args.push(ASTNode::Literal(Literal::String(text)));
+                }
+                Token::Fd(_) => break,
+                _ if self.peek_redirect_start() => break,
+                _ if matches!(token, Token::Pipe | Token::RParen | Token::RBrace | Token::Comma | Token::Semicolon) => break,
+                _ => break,
+            }
+        }
+
+        let mut command = ASTNode::Command { name, args };
+        while self.peek_redirect_start() {
+            command = self.parse_redirect(command)?;
+        }
+        Ok(command)
+    }
+
+    fn peek_redirect_start(&self) -> bool {
+        matches!(self.peek(), Some(Token::GreaterThan)
+            | Some(Token::AppendGreaterThan)
+            | Some(Token::LessThan)
+            | Some(Token::CombinedRedirect)
+            | Some(Token::Fd(_)))
+    }
+
+    fn parse_redirect(&mut self, source: ASTNode) -> Result<ASTNode> {
+        let mut fd = 1;
+        let mut merge_stderr = false;
+
+        if let Some(Token::Fd(fd_value)) = self.peek() {
+            fd = *fd_value;
+            self.next();
+        }
+
+        let mode = match self.next() {
+            Some(Token::GreaterThan) => RedirectMode::Truncate,
+            Some(Token::AppendGreaterThan) => RedirectMode::Append,
+            Some(Token::LessThan) => {
+                fd = 0;
+                RedirectMode::Truncate
+            }
+            Some(Token::CombinedRedirect) => {
+                fd = 1;
+                merge_stderr = true;
+                RedirectMode::Truncate
+            }
+            other => return Err(ParseError::new(format!("Expected redirect operator, found {:?}", other))),
+        };
+
+        let target = self.parse_redirect_target()?;
+        Ok(ASTNode::Redirect {
+            source: Box::new(source),
+            fd,
+            mode,
+            target,
+            merge_stderr,
+        })
+    }
+
+    fn parse_redirect_target(&mut self) -> Result<RedirectTarget> {
+        match self.next().cloned() {
+            Some(Token::Word(text)) => Ok(RedirectTarget::File(text)),
+            Some(Token::Identifier(text)) => Ok(RedirectTarget::File(text)),
+            Some(Token::StringLiteral(text)) => Ok(RedirectTarget::File(text)),
+            Some(Token::Number(text)) => Ok(RedirectTarget::File(text)),
+            Some(other) => Err(ParseError::new(format!("Expected redirect target, found {:?}", other))),
+            None => Err(ParseError::new("Expected redirect target, found end of input")),
+        }
     }
 }
 

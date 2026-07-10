@@ -1,7 +1,8 @@
 mod parser;
 
+use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 
 fn main() {
     println!("Welcome to TruShell Native Engine");
@@ -45,10 +46,11 @@ fn main() {
 
         match parser::parse_line(trimmed_input) {
             Ok(ast) => {
-                // If the parsed AST looks like a CLI invocation that was
-                // accidentally parsed as subtraction (e.g. `ls -la` -> `ls - la`),
-                // fall back to executing the system command.
-                if let Some((cmd, args)) = probable_cli_from_ast(&ast) {
+                if let Some(status) = execute_ast(&ast) {
+                    if !status.success() {
+                        eprintln!("trushell: command failed with status {}", status);
+                    }
+                } else if let Some((cmd, args)) = probable_cli_from_ast(&ast) {
                     let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
                     execute_system_command(&cmd, &arg_refs);
                 } else {
@@ -116,7 +118,6 @@ fn probable_cli_from_ast(ast: &parser::ASTNode) -> Option<(String, Vec<String>)>
 }
 
 fn execute_system_command(cmd: &str, args: &[&str]) {
-    // Removed 'mut' here to fix the compilation warning perfectly
     let child = Command::new(cmd)
         .args(args)
         .stdin(Stdio::inherit())
@@ -133,5 +134,136 @@ fn execute_system_command(cmd: &str, args: &[&str]) {
         Err(e) => {
             eprintln!("trushell: command not found '{}': {}", cmd, e);
         }
+    }
+}
+
+fn execute_ast(ast: &parser::ASTNode) -> Option<ExitStatus> {
+    match ast {
+        parser::ASTNode::Command { name, args } => {
+            let args: Vec<String> = args.iter().map(render_arg).collect();
+            execute_command(name, &args, None, None, None)
+        }
+        parser::ASTNode::Redirect { source, fd, mode, target, merge_stderr } => {
+            let (stdin, stdout, stderr) = build_redirect_stdio(fd, mode, target, *merge_stderr).ok()?;
+            match &**source {
+                parser::ASTNode::Command { name, args } => {
+                    let args: Vec<String> = args.iter().map(render_arg).collect();
+                    execute_command(name, &args, stdin, stdout, stderr)
+                }
+                parser::ASTNode::Redirect { .. } => execute_ast(source),
+                _ => None,
+            }
+        }
+        parser::ASTNode::Pipeline { stages } => execute_pipeline(stages),
+        _ => None,
+    }
+}
+
+fn execute_command(
+    cmd: &str,
+    args: &[String],
+    stdin: Option<Stdio>,
+    stdout: Option<Stdio>,
+    stderr: Option<Stdio>,
+) -> Option<ExitStatus> {
+    let mut command = Command::new(cmd);
+    command.args(args);
+
+    if let Some(stdin) = stdin {
+        command.stdin(stdin);
+    }
+    if let Some(stdout) = stdout {
+        command.stdout(stdout);
+    }
+    if let Some(stderr) = stderr {
+        command.stderr(stderr);
+    }
+
+    match command.spawn() {
+        Ok(mut child) => child.wait().ok(),
+        Err(err) => {
+            eprintln!("trushell: command not found '{}': {}", cmd, err);
+            None
+        }
+    }
+}
+
+fn execute_pipeline(stages: &[Box<parser::ASTNode>]) -> Option<ExitStatus> {
+    let mut children: Vec<Child> = Vec::new();
+    let mut previous_stdout = None;
+
+    for stage in stages.iter() {
+        if let parser::ASTNode::Command { name, args } = &**stage {
+            let args: Vec<String> = args.iter().map(render_arg).collect();
+            let mut command = Command::new(name);
+            command.args(&args);
+
+            if let Some(stdout) = previous_stdout.take() {
+                command.stdin(stdout);
+            } else {
+                command.stdin(Stdio::inherit());
+            }
+
+            if stage != stages.last().unwrap() {
+                command.stdout(Stdio::piped());
+            } else {
+                command.stdout(Stdio::inherit());
+            }
+
+            command.stderr(Stdio::inherit());
+
+            match command.spawn() {
+                Ok(mut child) => {
+                    previous_stdout = child.stdout.take().map(Stdio::from);
+                    children.push(child);
+                }
+                Err(err) => {
+                    eprintln!("trushell: command failed to start '{}': {}", name, err);
+                    return None;
+                }
+            }
+        } else {
+            eprintln!("trushell: pipeline stage is not a command");
+            return None;
+        }
+    }
+
+    let mut last_status = None;
+    for mut child in children {
+        if let Ok(status) = child.wait() {
+            last_status = Some(status);
+        }
+    }
+
+    last_status
+}
+
+fn build_redirect_stdio(
+    fd: &u8,
+    mode: &parser::RedirectMode,
+    target: &parser::RedirectTarget,
+    merge_stderr: bool,
+) -> io::Result<(Option<Stdio>, Option<Stdio>, Option<Stdio>)> {
+    let file = match target {
+        parser::RedirectTarget::File(path) => match mode {
+            parser::RedirectMode::Truncate => OpenOptions::new().write(true).create(true).truncate(true).open(path),
+            parser::RedirectMode::Append => OpenOptions::new().write(true).create(true).append(true).open(path),
+        },
+    }?;
+
+    let stdin = if *fd == 0 { Some(Stdio::from(file.try_clone()?)) } else { None };
+    let stdout = if *fd == 1 { Some(Stdio::from(file.try_clone()?)) } else { None };
+    let stderr = if *fd == 2 || merge_stderr { Some(Stdio::from(file)) } else { None };
+    Ok((stdin, stdout, stderr))
+}
+
+fn render_arg(arg: &parser::ASTNode) -> String {
+    match arg {
+        parser::ASTNode::Literal(parser::Literal::String(text)) => text.clone(),
+        parser::ASTNode::Literal(parser::Literal::Number { value, unit }) => {
+            value.to_string() + unit.as_deref().unwrap_or("")
+        }
+        parser::ASTNode::Identifier(name) => name.clone(),
+        _ => format!("{:#?}", arg),
     }
 }
