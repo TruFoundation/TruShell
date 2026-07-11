@@ -34,9 +34,11 @@ fn main() {
             break;
         }
 
-        if trimmed_input.starts_with("cd") {
-            let parts: Vec<&str> = trimmed_input.split_whitespace().collect();
-            let new_dir = parts.get(1).copied().unwrap_or(".");
+        let parts = split_posix_words(trimmed_input);
+        if parts.first().map(String::as_str) == Some("cd") {
+            let new_dir = parts.get(1).map(String::as_str).unwrap_or_else(|| {
+                std::env::var("HOME").as_deref().unwrap_or(".")
+            });
             if let Err(e) = std::env::set_current_dir(new_dir) {
                 eprintln!("trushell: cd: {}: {}", new_dir, e);
             }
@@ -49,18 +51,14 @@ fn main() {
                 // accidentally parsed as subtraction (e.g. `ls -la` -> `ls - la`),
                 // fall back to executing the system command.
                 if let Some((cmd, args)) = probable_cli_from_ast(&ast) {
-                    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                    execute_system_command(&cmd, &arg_refs);
+                    execute_system_command(&cmd, &args);
                 } else {
                     println!("Parsed AST: {:#?}", ast);
                 }
             }
             Err(err) => {
                 eprintln!("Parse error: {}", err);
-                let parts: Vec<&str> = trimmed_input.split_whitespace().collect();
-                let command = parts[0];
-                let args = &parts[1..];
-                execute_system_command(command, args);
+                execute_system_command_from_input(trimmed_input);
             }
         }
     }
@@ -115,9 +113,63 @@ fn probable_cli_from_ast(ast: &parser::ASTNode) -> Option<(String, Vec<String>)>
     Some((cmd, args))
 }
 
-fn execute_system_command(cmd: &str, args: &[&str]) {
-    // Removed 'mut' here to fix the compilation warning perfectly
-    let child = Command::new(cmd)
+fn split_posix_words(input: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut chars = input.chars().peekable();
+    let mut quote_mode: Option<char> = None;
+
+    while let Some(ch) = chars.next() {
+        match quote_mode {
+            Some('"') => match ch {
+                '\\' => {
+                    if let Some(next) = chars.next() {
+                        current.push(next);
+                    }
+                }
+                '"' => quote_mode = None,
+                _ => current.push(ch),
+            },
+            Some('\'') => {
+                if ch == '\'' {
+                    quote_mode = None;
+                } else {
+                    current.push(ch);
+                }
+            }
+            None => match ch {
+                '\'' => quote_mode = Some('\''),
+                '"' => quote_mode = Some('"'),
+                '\\' => {
+                    if let Some(next) = chars.next() {
+                        current.push(next);
+                    }
+                }
+                ch if ch.is_whitespace() => {
+                    if !current.is_empty() {
+                        words.push(std::mem::take(&mut current));
+                    }
+                }
+                _ => current.push(ch),
+            },
+        }
+    }
+
+    if !current.is_empty() {
+        words.push(current);
+    }
+
+    words
+}
+
+fn execute_system_command(cmd: &str, args: &[String]) {
+    let command_name = if cmd.is_empty() {
+        return;
+    } else {
+        cmd
+    };
+
+    let child = Command::new(command_name)
         .args(args)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
@@ -131,7 +183,18 @@ fn execute_system_command(cmd: &str, args: &[&str]) {
             }
         }
         Err(e) => {
-            eprintln!("trushell: command not found '{}': {}", cmd, e);
+            eprintln!("trushell: command not found '{}': {}", command_name, e);
         }
     }
+}
+
+fn execute_system_command_from_input(input: &str) {
+    let parts = split_posix_words(input);
+    if parts.is_empty() {
+        return;
+    }
+
+    let cmd = parts[0].clone();
+    let args = parts.into_iter().skip(1).collect::<Vec<_>>();
+    execute_system_command(&cmd, &args);
 }
