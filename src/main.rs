@@ -138,24 +138,45 @@ fn execute_system_command(cmd: &str, args: &[&str]) {
 }
 
 fn execute_ast(ast: &parser::ASTNode) -> Option<ExitStatus> {
-    match ast {
-        parser::ASTNode::Command { name, args } => {
-            let args: Vec<String> = args.iter().map(render_arg).collect();
-            execute_command(name, &args, None, None, None)
-        }
-        parser::ASTNode::Redirect { source, fd, mode, target, merge_stderr } => {
-            let (stdin, stdout, stderr) = build_redirect_stdio(fd, mode, target, *merge_stderr).ok()?;
-            match &**source {
-                parser::ASTNode::Command { name, args } => {
-                    let args: Vec<String> = args.iter().map(render_arg).collect();
-                    execute_command(name, &args, stdin, stdout, stderr)
-                }
-                parser::ASTNode::Redirect { .. } => execute_ast(source),
-                _ => None,
+    if let Some((cmd, args, stdin, stdout, stderr)) = collect_command_and_redirections(ast) {
+        execute_command(&cmd, &args, stdin, stdout, stderr)
+    } else if let parser::ASTNode::Pipeline { stages } = ast {
+        execute_pipeline(stages)
+    } else {
+        None
+    }
+}
+
+fn collect_command_and_redirections(
+    ast: &parser::ASTNode,
+) -> Option<(String, Vec<String>, Option<Stdio>, Option<Stdio>, Option<Stdio>)> {
+    let mut stdin = None;
+    let mut stdout = None;
+    let mut stderr = None;
+    let mut current = ast;
+
+    loop {
+        match current {
+            parser::ASTNode::Command { name, args } => {
+                let args: Vec<String> = args.iter().map(render_arg).collect();
+                return Some((name.clone(), args, stdin, stdout, stderr));
             }
+            parser::ASTNode::Redirect { source, fd, mode, target, merge_stderr } => {
+                let (redirect_stdin, redirect_stdout, redirect_stderr) =
+                    build_redirect_stdio(fd, mode, target, *merge_stderr).ok()?;
+                if redirect_stdin.is_some() {
+                    stdin = redirect_stdin;
+                }
+                if redirect_stdout.is_some() {
+                    stdout = redirect_stdout;
+                }
+                if redirect_stderr.is_some() {
+                    stderr = redirect_stderr;
+                }
+                current = source;
+            }
+            _ => return None,
         }
-        parser::ASTNode::Pipeline { stages } => execute_pipeline(stages),
-        _ => None,
     }
 }
 
@@ -190,41 +211,48 @@ fn execute_command(
 
 fn execute_pipeline(stages: &[Box<parser::ASTNode>]) -> Option<ExitStatus> {
     let mut children: Vec<Child> = Vec::new();
-    let mut previous_stdout = None;
+    let mut previous_pipe_reader: Option<Stdio> = None;
 
-    for stage in stages.iter() {
-        if let parser::ASTNode::Command { name, args } = &**stage {
-            let args: Vec<String> = args.iter().map(render_arg).collect();
-            let mut command = Command::new(name);
-            command.args(&args);
-
-            if let Some(stdout) = previous_stdout.take() {
-                command.stdin(stdout);
-            } else {
-                command.stdin(Stdio::inherit());
+    for (index, stage) in stages.iter().enumerate() {
+        let (cmd, args, stdin, stdout, stderr) = match collect_command_and_redirections(stage) {
+            Some(values) => values,
+            None => {
+                eprintln!("trushell: pipeline stage is not executable");
+                return None;
             }
+        };
 
-            if stage != stages.last().unwrap() {
-                command.stdout(Stdio::piped());
-            } else {
-                command.stdout(Stdio::inherit());
-            }
+        let mut command = Command::new(&cmd);
+        command.args(&args);
 
-            command.stderr(Stdio::inherit());
-
-            match command.spawn() {
-                Ok(mut child) => {
-                    previous_stdout = child.stdout.take().map(Stdio::from);
-                    children.push(child);
-                }
-                Err(err) => {
-                    eprintln!("trushell: command failed to start '{}': {}", name, err);
-                    return None;
-                }
-            }
+        if let Some(stdin) = stdin {
+            command.stdin(stdin);
+        } else if let Some(pipe_reader) = previous_pipe_reader.take() {
+            command.stdin(pipe_reader);
         } else {
-            eprintln!("trushell: pipeline stage is not a command");
-            return None;
+            command.stdin(Stdio::inherit());
+        }
+
+        let is_last_stage = index == stages.len() - 1;
+        if let Some(stdout) = stdout {
+            command.stdout(stdout);
+        } else if is_last_stage {
+            command.stdout(Stdio::inherit());
+        } else {
+            command.stdout(Stdio::piped());
+        }
+
+        command.stderr(stderr.unwrap_or_else(|| Stdio::inherit()));
+
+        match command.spawn() {
+            Ok(mut child) => {
+                previous_pipe_reader = child.stdout.take().map(Stdio::from);
+                children.push(child);
+            }
+            Err(err) => {
+                eprintln!("trushell: command failed to start '{}': {}", cmd, err);
+                return None;
+            }
         }
     }
 
@@ -265,5 +293,75 @@ fn render_arg(arg: &parser::ASTNode) -> String {
         }
         parser::ASTNode::Identifier(name) => name.clone(),
         _ => format!("{:#?}", arg),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use std::fs::{read_to_string, remove_file};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_file(prefix: &str) -> PathBuf {
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let mut path = env::temp_dir();
+        path.push(format!("trushell_test_{}_{}.txt", prefix, ts));
+        path
+    }
+
+    #[test]
+    fn execute_command_with_output_redirect() {
+        let path = unique_temp_file("redirect");
+        let ast = parser::ASTNode::Redirect {
+            source: Box::new(parser::ASTNode::Command {
+                name: "echo".into(),
+                args: vec![parser::ASTNode::Literal(parser::Literal::String("test".into()))],
+            }),
+            fd: 1,
+            mode: parser::RedirectMode::Truncate,
+            target: parser::RedirectTarget::File(path.to_string_lossy().into_owned()),
+            merge_stderr: false,
+        };
+
+        let status = execute_ast(&ast).expect("command failed");
+        assert!(status.success());
+
+        let contents = read_to_string(&path).expect("failed to read output file");
+        assert_eq!(contents, "test\n");
+        remove_file(&path).ok();
+    }
+
+    #[test]
+    fn execute_pipeline_with_redirected_last_stage() {
+        let path = unique_temp_file("pipeline");
+
+        let stage1 = parser::ASTNode::Command {
+            name: "echo".into(),
+            args: vec![parser::ASTNode::Literal(parser::Literal::String("hello".into()))],
+        };
+
+        let stage2 = parser::ASTNode::Redirect {
+            source: Box::new(parser::ASTNode::Command {
+                name: "cat".into(),
+                args: vec![],
+            }),
+            fd: 1,
+            mode: parser::RedirectMode::Truncate,
+            target: parser::RedirectTarget::File(path.to_string_lossy().into_owned()),
+            merge_stderr: false,
+        };
+
+        let pipeline = parser::ASTNode::Pipeline {
+            stages: vec![Box::new(stage1), Box::new(stage2)],
+        };
+
+        let status = execute_ast(&pipeline).expect("pipeline failed");
+        assert!(status.success());
+
+        let contents = read_to_string(&path).expect("failed to read pipeline output file");
+        assert_eq!(contents, "hello\n");
+        remove_file(&path).ok();
     }
 }
