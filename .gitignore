@@ -1,0 +1,40 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# Compiled libraries and debug symbols
+*.pdb
+*.exp
+*.ilk
+*.lib
+
+# Cargo.lock
+
+# Editor and IDE droppings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+.code-workspace
+
+# Operating system clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+._*
+
+# Test outputs, logs, and coverage
+*.log
+*.tmp
+*.gcda
+*.gcno
+*.gcov
+coverage/
+*.profdata
+*.prof
+
+# Local environment overrides
+.env
+.env.local
