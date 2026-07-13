@@ -1,8 +1,7 @@
 mod parser;
 
-use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
 
 fn main() {
     println!("Welcome to TruShell Native Engine");
@@ -37,10 +36,11 @@ fn main() {
 
         let parts = split_posix_words(trimmed_input);
         if parts.first().map(String::as_str) == Some("cd") {
-            let new_dir = parts.get(1).map(String::as_str).unwrap_or_else(|| {
-                std::env::var("HOME").as_deref().unwrap_or(".")
-            });
-            if let Err(e) = std::env::set_current_dir(new_dir) {
+            let new_dir = parts
+                .get(1)
+                .cloned()
+                .unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+            if let Err(e) = std::env::set_current_dir(new_dir.as_str()) {
                 eprintln!("trushell: cd: {}: {}", new_dir, e);
             }
             continue;
@@ -153,6 +153,9 @@ fn split_posix_words(input: &str) -> Vec<String> {
                 }
                 _ => current.push(ch),
             },
+            Some(other) => {
+                current.push(other);
+            }
         }
     }
 

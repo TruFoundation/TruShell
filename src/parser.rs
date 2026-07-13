@@ -178,8 +178,8 @@ impl<'a> Lexer<'a> {
                         return Err(ParseError::new("Unexpected '&' without redirect"));
                     }
                 }
-                '"' => {
-                    tokens.push(self.lex_string()?);
+                '"' | '\'' => {
+                    tokens.push(self.lex_string(ch)?);
                 }
                 '=' => {
                     self.chars.next();
@@ -397,13 +397,20 @@ impl<'a> Lexer<'a> {
         Ok(Token::Word(value))
     }
 
-    fn lex_string(&mut self) -> Result<Token> {
+    fn lex_string(&mut self, quote: char) -> Result<Token> {
         self.chars.next();
         let mut value = String::new();
 
         while let Some(ch) = self.chars.next() {
             match ch {
-                '"' => return Ok(Token::StringLiteral(value)),
+                ch if ch == quote => return Ok(Token::StringLiteral(value)),
+                '\\' if quote == '"' => {
+                    if let Some(next) = self.chars.next() {
+                        value.push(next);
+                    } else {
+                        value.push('\\');
+                    }
+                }
                 other => value.push(other),
             }
         }
