@@ -1,6 +1,4 @@
 # 🐄 TruShell 
-A Productivity Shell for Task Tracking and Time Management
-
 **TruShell** is an interactive shell environment designed to integrate task tracking and time management tools seamlessly with traditional terminal commands. Built in Rust with a custom expression parser, TruShell extends the Unix philosophy by providing a unified interface where productivity features and system commands coexist naturally.
 
 ---
@@ -32,8 +30,9 @@ TruShell is not a replacement shell but rather a **productivity layer** that bri
 ### Key Features
 
 - **Hybrid Parsing**: Intelligently distinguishes between shell commands and custom expressions
-- **Expression Evaluation**: Supports arithmetic, comparisons, variables, and pipelines
+- **Expression Evaluation**: Supports arithmetic, comparisons, variables, pipelines, and redirects
 - **Pipeline Support**: Chain operations together using the pipe operator (`|`)
+- **Redirect Support**: Handle command redirection with `>`, `>>`, `<`, and `&>` for both standalone commands and pipeline stages
 - **Task Integration**: Foundation for task tracking and time management (future expansion)
 - **Graceful Fallback**: Executes as system commands if parsing fails
 
@@ -183,6 +182,18 @@ Chain operations together using `|`:
 
 ```
 trushell ❯ ls() | filter { $it.size > 1mb }
+```
+
+#### Redirects
+
+Redirect command input/output and combine streams:
+
+```
+trushell ❯ echo hello > out.txt
+trushell ❯ echo append >> out.txt
+trushell ❯ cat < in.txt
+trushell ❯ echo hello | cat > out.txt
+trushell ❯ echo error &> error.log
 ```
 
 ---
@@ -355,6 +366,7 @@ pub enum ASTNode {
     Let { name: String, value: Box<ASTNode> },
     Pipeline { stages: Vec<Box<ASTNode>> },
     Command { name: String, args: Vec<ASTNode> },
+    Redirect { source: Box<ASTNode>, fd: u8, mode: RedirectMode, target: RedirectTarget, merge_stderr: bool },
     Block { body: Vec<ASTNode> },
     BinaryOp { left: Box<ASTNode>, op: BinaryOperator, right: Box<ASTNode> },
     Variable(String),
@@ -613,6 +625,18 @@ Err(err) => {
 ```
 
 **Result**: Most Unix commands work transparently even if parsing fails.
+
+### Redirect and Pipeline Execution
+
+TruShell now supports shell-style redirection for parsed commands, including standalone redirects and redirects on pipeline stages. The execution engine resolves redirect AST nodes before spawning processes and correctly wires command stdin/stdout for pipes:
+
+- `cmd > file` writes stdout to a file
+- `cmd >> file` appends stdout to a file
+- `cmd < file` reads stdin from a file
+- `cmd &> file` redirects stderr to the same target file
+- `cmd | other > file` pipes data into a redirected final stage
+
+This integration keeps parsed AST behavior aligned with traditional shell semantics while preserving the existing fallback execution model.
 
 ### Process Management
 
