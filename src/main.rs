@@ -1,5 +1,6 @@
 mod parser;
 mod job_control;
+mod terminal;
 
 use std::io::{self, Write};
 
@@ -8,9 +9,11 @@ fn main() {
 
     // Initialize job control and signal handlers
     job_control::init_signal_handlers();
+    let mut terminal = terminal::Terminal::new(24, 80);
 
     loop {
-        print!("trushell ❯ ");
+        let prompt = terminal.prompt();
+        print!("{prompt}");
         if let Err(e) = io::stdout().flush() {
             eprintln!("Prompt flush error: {}", e);
             continue;

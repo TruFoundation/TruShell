@@ -1,42 +1,58 @@
+use nu_ansi_term::{Color, Style};
 use unicode_width::UnicodeWidthChar;
+use vte::{Params, Parser, Perform};
 
-#[derive(Debug, Clone, PartialEq)]
 pub struct Terminal {
+    parser: Parser,
+    buffer: TerminalBuffer,
+}
+
+struct TerminalBuffer {
     width: usize,
     height: usize,
     rows: Vec<String>,
     cursor_row: usize,
     cursor_col: usize,
+    current_style: Style,
 }
 
 impl Terminal {
     pub fn new(height: usize, width: usize) -> Self {
+        Self {
+            parser: Parser::new(),
+            buffer: TerminalBuffer::new(height, width),
+        }
+    }
+
+    pub fn write(&mut self, input: &str) {
+        for byte in input.bytes() {
+            self.parser.advance(&mut self.buffer, byte);
+        }
+    }
+
+    pub fn screen(&self) -> Vec<String> {
+        self.buffer.rows.clone()
+    }
+
+    pub fn cursor_position(&self) -> (usize, usize) {
+        (self.buffer.cursor_row, self.buffer.cursor_col)
+    }
+
+    pub fn prompt(&self) -> String {
+        Style::new().bold().fg(Color::Cyan).paint("trushell ❯").to_string()
+    }
+}
+
+impl TerminalBuffer {
+    fn new(height: usize, width: usize) -> Self {
         Self {
             width: width.max(1),
             height: height.max(1),
             rows: vec![String::new(); height.max(1)],
             cursor_row: 0,
             cursor_col: 0,
+            current_style: Style::new(),
         }
-    }
-
-    pub fn write(&mut self, input: &str) {
-        let mut chars = input.chars().peekable();
-        while let Some(ch) = chars.next() {
-            if ch == '\u{1b}' {
-                self.handle_escape(&mut chars);
-            } else {
-                self.write_char(ch);
-            }
-        }
-    }
-
-    pub fn screen(&self) -> Vec<String> {
-        self.rows.clone()
-    }
-
-    pub fn cursor_position(&self) -> (usize, usize) {
-        (self.cursor_row, self.cursor_col)
     }
 
     fn write_char(&mut self, ch: char) {
@@ -59,69 +75,6 @@ impl Terminal {
                 self.rows[self.cursor_row].push(ch);
                 self.cursor_col += width;
             }
-        }
-    }
-
-    fn handle_escape(&mut self, chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
-        match chars.next() {
-            Some('[') => {
-                let mut params = String::new();
-                let mut final_byte = None;
-
-                while let Some(ch) = chars.next() {
-                    if ch.is_ascii_digit() || ch == ';' {
-                        params.push(ch);
-                    } else {
-                        final_byte = Some(ch);
-                        break;
-                    }
-                }
-
-                if let Some(final_byte) = final_byte {
-                    self.handle_csi(&params, final_byte);
-                }
-            }
-            Some('(') => {
-                let _ = chars.next();
-            }
-            Some(_) | None => {}
-        }
-    }
-
-    fn handle_csi(&mut self, params: &str, final_byte: char) {
-        match final_byte {
-            'J' => {
-                let mode = params.trim();
-                if mode == "2" {
-                    self.clear_screen();
-                } else {
-                    self.clear_to_end();
-                }
-            }
-            'K' => self.clear_line(),
-            'H' | 'f' => {
-                let (row, col) = parse_cursor_location(params);
-                self.cursor_row = row.min(self.height.saturating_sub(1));
-                self.cursor_col = col.min(self.width.saturating_sub(1));
-            }
-            'A' => {
-                let amount = params.parse::<usize>().unwrap_or(1);
-                self.cursor_row = self.cursor_row.saturating_sub(amount);
-            }
-            'B' => {
-                let amount = params.parse::<usize>().unwrap_or(1);
-                self.cursor_row = (self.cursor_row + amount).min(self.height.saturating_sub(1));
-            }
-            'C' => {
-                let amount = params.parse::<usize>().unwrap_or(1);
-                self.cursor_col = (self.cursor_col + amount).min(self.width.saturating_sub(1));
-            }
-            'D' => {
-                let amount = params.parse::<usize>().unwrap_or(1);
-                self.cursor_col = self.cursor_col.saturating_sub(amount);
-            }
-            'm' => {}
-            _ => {}
         }
     }
 
@@ -180,11 +133,97 @@ impl Terminal {
         self.rows.push(String::new());
         self.cursor_row = self.height.saturating_sub(1);
     }
+
+    fn handle_sgr(&mut self, params: &[i64]) {
+        if params.is_empty() {
+            self.current_style = Style::new();
+            return;
+        }
+
+        for param in params {
+            match *param {
+                0 => self.current_style = Style::new(),
+                1 => self.current_style = self.current_style.bold(),
+                4 => self.current_style = self.current_style.underline(),
+                31 => self.current_style = self.current_style.fg(Color::Red),
+                32 => self.current_style = self.current_style.fg(Color::Green),
+                33 => self.current_style = self.current_style.fg(Color::Yellow),
+                34 => self.current_style = self.current_style.fg(Color::Blue),
+                35 => self.current_style = self.current_style.fg(Color::Purple),
+                36 => self.current_style = self.current_style.fg(Color::Cyan),
+                37 => self.current_style = self.current_style.fg(Color::White),
+                90..=97 => self.current_style = self.current_style.fg(Color::White),
+                _ => {}
+            }
+        }
+    }
 }
 
-fn parse_cursor_location(params: &str) -> (usize, usize) {
-    let mut values = params.split(';').filter(|s| !s.is_empty());
-    let row = values.next().unwrap_or("1").parse::<usize>().unwrap_or(1).saturating_sub(1);
-    let col = values.next().unwrap_or("1").parse::<usize>().unwrap_or(1).saturating_sub(1);
-    (row, col)
+impl Perform for TerminalBuffer {
+    fn print(&mut self, ch: char) {
+        self.write_char(ch);
+    }
+
+    fn execute(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.newline(),
+            b'\r' => self.cursor_col = 0,
+            b'\t' => self.advance_tab(),
+            b'\x08' => self.backspace(),
+            _ => {}
+        }
+    }
+
+    fn hook(&mut self, _params: &Params, _intermediates: &[u8], _ignore: bool, _c: char) {}
+
+    fn put(&mut self, _ch: u8) {}
+
+    fn unhook(&mut self) {}
+
+    fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {}
+
+    fn csi_dispatch(&mut self, params: &Params, _intermediates: &[u8], _ignore: bool, action: char) {
+        let params: Vec<i64> = params
+            .iter()
+            .flat_map(|param| param.iter().copied().map(|value| i64::from(value)))
+            .collect();
+
+        match action {
+            'J' => {
+                let mode = params.first().copied().unwrap_or(0);
+                if mode == 2 {
+                    self.clear_screen();
+                } else {
+                    self.clear_to_end();
+                }
+            }
+            'K' => self.clear_line(),
+            'H' | 'f' => {
+                let row = params.first().copied().unwrap_or(1).saturating_sub(1) as usize;
+                let col = params.get(1).copied().unwrap_or(1).saturating_sub(1) as usize;
+                self.cursor_row = row.min(self.height.saturating_sub(1));
+                self.cursor_col = col.min(self.width.saturating_sub(1));
+            }
+            'A' => {
+                let amount = params.first().copied().unwrap_or(1) as usize;
+                self.cursor_row = self.cursor_row.saturating_sub(amount);
+            }
+            'B' => {
+                let amount = params.first().copied().unwrap_or(1) as usize;
+                self.cursor_row = (self.cursor_row + amount).min(self.height.saturating_sub(1));
+            }
+            'C' => {
+                let amount = params.first().copied().unwrap_or(1) as usize;
+                self.cursor_col = (self.cursor_col + amount).min(self.width.saturating_sub(1));
+            }
+            'D' => {
+                let amount = params.first().copied().unwrap_or(1) as usize;
+                self.cursor_col = self.cursor_col.saturating_sub(amount);
+            }
+            'm' => self.handle_sgr(&params),
+            _ => {}
+        }
+    }
+
+    fn osc_dispatch(&mut self, _params: &[&[u8]], _bell_terminated: bool) {}
 }
