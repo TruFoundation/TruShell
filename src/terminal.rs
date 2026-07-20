@@ -10,7 +10,7 @@ pub struct Terminal {
 struct TerminalBuffer {
     width: usize,
     height: usize,
-    rows: Vec<String>,
+    rows: Vec<Vec<char>>,
     cursor_row: usize,
     cursor_col: usize,
     current_style: Style,
@@ -31,7 +31,11 @@ impl Terminal {
     }
 
     pub fn screen(&self) -> Vec<String> {
-        self.buffer.rows.clone()
+        self.buffer
+            .rows
+            .iter()
+            .map(|row| row.iter().collect::<String>().trim_end().to_string())
+            .collect()
     }
 
     pub fn cursor_position(&self) -> (usize, usize) {
@@ -45,10 +49,12 @@ impl Terminal {
 
 impl TerminalBuffer {
     fn new(height: usize, width: usize) -> Self {
+        let height = height.max(1);
+        let width = width.max(1);
         Self {
-            width: width.max(1),
-            height: height.max(1),
-            rows: vec![String::new(); height.max(1)],
+            width,
+            height,
+            rows: vec![vec![' '; width]; height],
             cursor_row: 0,
             cursor_col: 0,
             current_style: Style::new(),
@@ -63,7 +69,7 @@ impl TerminalBuffer {
             '\u{8}' => self.backspace(),
             _ if ch.is_control() => {}
             _ => {
-                let width = ch.width().unwrap_or(1);
+                let width = 1usize;
                 if self.cursor_col + width > self.width {
                     self.newline();
                 }
@@ -72,8 +78,9 @@ impl TerminalBuffer {
                     self.scroll_up();
                 }
 
-                self.rows[self.cursor_row].push(ch);
-                self.cursor_col += width;
+                let row = &mut self.rows[self.cursor_row];
+                row[self.cursor_col] = ch;
+                self.cursor_col = (self.cursor_col + width).min(self.width.saturating_sub(1));
             }
         }
     }
@@ -90,11 +97,7 @@ impl TerminalBuffer {
         if self.cursor_col > 0 {
             self.cursor_col -= 1;
             if let Some(row) = self.rows.get_mut(self.cursor_row) {
-                let mut chars: Vec<char> = row.chars().collect();
-                if !chars.is_empty() {
-                    chars.pop();
-                    *row = chars.into_iter().collect();
-                }
+                row[self.cursor_col] = ' ';
             }
         }
     }
@@ -106,31 +109,39 @@ impl TerminalBuffer {
     }
 
     fn clear_screen(&mut self) {
-        self.rows.iter_mut().for_each(|row| row.clear());
+        self.rows.iter_mut().for_each(|row| {
+            for cell in row.iter_mut() {
+                *cell = ' ';
+            }
+        });
         self.cursor_row = 0;
         self.cursor_col = 0;
     }
 
     fn clear_to_end(&mut self) {
         if let Some(row) = self.rows.get_mut(self.cursor_row) {
-            row.clear();
+            for cell in row.iter_mut().skip(self.cursor_col) {
+                *cell = ' ';
+            }
         }
         for row in self.rows.iter_mut().skip(self.cursor_row + 1) {
-            row.clear();
+            for cell in row.iter_mut() {
+                *cell = ' ';
+            }
         }
-        self.cursor_col = 0;
     }
 
     fn clear_line(&mut self) {
         if let Some(row) = self.rows.get_mut(self.cursor_row) {
-            row.clear();
+            for cell in row.iter_mut().skip(self.cursor_col) {
+                *cell = ' ';
+            }
         }
-        self.cursor_col = 0;
     }
 
     fn scroll_up(&mut self) {
         self.rows.remove(0);
-        self.rows.push(String::new());
+        self.rows.push(vec![' '; self.width]);
         self.cursor_row = self.height.saturating_sub(1);
     }
 
