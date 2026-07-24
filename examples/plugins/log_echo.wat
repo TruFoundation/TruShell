@@ -1,0 +1,11 @@
+(module
+  (memory (export "memory") 1)
+  (func (import "env" "host_log") (param i32 i32))
+  (func (export "run") (param $ptr i32) (param $len i32)
+    (local $msg_ptr i32)
+    (local $msg_len i32)
+    (local.set $msg_ptr (local.get $ptr))
+    (local.set $msg_len (local.get $len))
+    (call 0 (local.get $msg_ptr) (local.get $msg_len))
+  )
+)

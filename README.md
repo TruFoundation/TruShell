@@ -275,6 +275,46 @@ trushell> let result = ($x + $y) * 2
 # result is 60
 ```
 
+## WASM Plugin Host
+
+TruShell can load sandboxed WASM plugins with a capability-based host model.
+Plugins live in `examples/plugins` and must publish a JSON manifest next to the WASM module.
+
+### Plugin CLI
+
+```bash
+trushell> plugin manifest examples/plugins/log_echo.wat
+trushell> plugin run examples/plugins/log_echo.wat "Hello from host"
+```
+
+### Plugin manifest
+
+A plugin manifest looks like this:
+
+```json
+{
+  "name": "log-echo",
+  "version": "0.1.0",
+  "api_version": "1.0",
+  "capabilities": ["logging"]
+}
+```
+
+### Supported capabilities
+
+- `logging` – allows plugins to call `host_log`.
+- `environment-get` – allows plugins to call `host_get_env`.
+
+### Example plugins
+
+- `examples/plugins/log_echo.wat` – logs the input string using the host logger.
+- `examples/plugins/env_logger.wat` – reads an environment variable and logs the result.
+
+### Plugin safety model
+
+Plugins are sandboxed in WASM. The host only exposes host functions for the declared capabilities.
+A plugin with missing capabilities will fail to instantiate if it imports host functions it is not allowed to call.
+
 ---
 
 ## SYNTAX

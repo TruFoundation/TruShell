@@ -1,7 +1,9 @@
 mod parser;
 mod job_control;
 mod terminal;
+mod wasm_host;
 
+use crate::wasm_host::{load_plugin_manifest, WasmPlugin};
 use std::io::{self, Write};
 
 fn main() {
@@ -48,6 +50,48 @@ fn main() {
                 .unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
             if let Err(e) = std::env::set_current_dir(new_dir.as_str()) {
                 eprintln!("trushell: cd: {}: {}", new_dir, e);
+            }
+            continue;
+        }
+
+        if parts.first().map(String::as_str) == Some("plugin") {
+            match parts.get(1).map(String::as_str) {
+                Some("run") => {
+                    let module_path = parts.get(2).cloned();
+                    let input = parts.get(3).cloned().unwrap_or_default();
+                    if let Some(path) = module_path {
+                        match WasmPlugin::load(&path) {
+                            Ok(mut plugin) => match plugin.run(&input) {
+                                Ok(logs) => {
+                                    for line in logs {
+                                        println!("plugin: {line}");
+                                    }
+                                }
+                                Err(err) => eprintln!("Plugin execution failed: {}", err),
+                            },
+                            Err(err) => eprintln!("Failed to load plugin: {}", err),
+                        }
+                    } else {
+                        eprintln!("Usage: plugin run <module.wasm|module.wat> [input]");
+                    }
+                }
+                Some("manifest") => {
+                    if let Some(path) = parts.get(2) {
+                        match load_plugin_manifest(path) {
+                            Ok(manifest) => {
+                                println!("Plugin: {}@{}", manifest.name, manifest.version);
+                                println!("API version: {}", manifest.api_version);
+                                println!("Capabilities: {:?}", manifest.capabilities);
+                            }
+                            Err(err) => eprintln!("Failed to load manifest: {}", err),
+                        }
+                    } else {
+                        eprintln!("Usage: plugin manifest <module.wasm|module.wat>");
+                    }
+                }
+                _ => {
+                    eprintln!("Usage: plugin <run|manifest> ...");
+                }
             }
             continue;
         }
