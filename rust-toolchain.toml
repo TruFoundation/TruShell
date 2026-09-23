@@ -4,5 +4,5 @@
 # development to a known-good stable toolchain with the components CI
 # needs (rustfmt, clippy).
 [toolchain]
-channel = "stable"
+channel = "1.70.0"
 components = ["rustfmt", "clippy"]
