@@ -86,12 +86,7 @@ from documents and haven't been reproduced against the code.
 ## Index
 
     M0 housekeeping
-      TS-001  docs: no statement of goals and non-goals
-      TS-002  docs: POSIX_COMPATIBILITY_SPEC.md claims too much
-      TS-003  roadmap: task and time tracking do not belong in core
       TS-004  ci: we have not audited what CI actually checks
-      TS-035  build: Cargo.toml has an unterminated string, blocks all cargo commands
-      TS-036  ci: ci-packaging.yml is not valid YAML and has never run
 
     M1 core shell
       TS-005  parser: a failed parse runs the line as an external command
@@ -137,69 +132,6 @@ from documents and haven't been reproduced against the code.
 ===========================================================================
 M0: housekeeping
 ===========================================================================
-
-### TS-001  docs: no statement of goals and non-goals
-
-Kind: doc   Severity: high   Status: open
-
-The README calls TruShell "a general-purpose shell like Bash" and lists
-task management next to it. Nobody reviewing a patch can tell whether it
-is in scope, and nobody can tell whether bug-for-bug bash compatibility
-is something we promise. We should have said this on day one.
-
-Fix: a short goals/non-goals section in README.md, and the reasoning in
-docs/design/goals.md. Non-goals we currently intend: bug-for-bug bash
-compatibility, being a task manager or editor, a GUI.
-
-Done when: README and CONTRIBUTING both point at it, and GOVERNANCE.md
-says who can change it.
-
-
-### TS-002  docs: POSIX_COMPATIBILITY_SPEC.md claims too much
-
-Kind: doc   Severity: high   Status: in progress
-
-The file covers four behaviours: `cd` with no argument, quoting of
-arguments to external commands, `exit`, and fallback to external
-commands. That is a minimal-behaviour spec. POSIX compatibility means
-the whole Shell Command Language: lists, redirections, parameter
-expansion, special builtins, and so on. We do not have that, and a
-reader of the file name would assume we do.
-
-Status of the fix: the spec opens with a plain statement of its scope
-and lists what it does not cover. docs/compat/posix-matrix.md now has one
-row per feature, each with a snippet to try, and every row starts as
-"unverified". The v3 sprint also added acceptance tests for the four
-behaviours. Still to do: run every row against a real build and record
-the result. Renaming the file is optional; decide after checking whether
-the tests refer to it by name.
-
-Done when:
-
-  - the matrix has been run against a real build, with the commit and
-    date recorded at the top, and no row is still "unverified"
-  - the spec names the exact command that runs the acceptance tests
-  - no doc claims POSIX compatibility beyond what the matrix marks
-    "supported" (stating POSIX as a goal is fine)
-
-
-### TS-003  roadmap: task and time tracking do not belong in core
-
-Kind: design   Severity: low   Status: open
-
-These are leftovers from the Python-era productivity shell. Task
-create/list/complete and time start/stop/log are applications, and in
-core they drag in a database schema and a migration story for something
-that is not why anyone installs a shell. Everything in core has to be
-secured and maintained by us.
-
-Fix: drop both from the core roadmap. If someone wants them, they can be
-WASM plugins once the plugin API (TS-021) is stable. SQLite stays only
-for history (TS-015) and the audit log (TS-024).
-
-Done when: roadmap updated, repository topics cleaned up, any existing
-code moved to examples/plugins/ or removed.
-
 
 ### TS-004  ci: we have not audited what CI actually checks
 
@@ -267,63 +199,6 @@ protection, and Cargo.toml's rust-version matches a Rust version someone
 has actually built successfully. Windows is out of scope for now, and
 the README says so.
 
----
-
-### TS-035  build: Cargo.toml has an unterminated string, so no cargo command works
-
-Kind: bug   Severity: blocker   Status: open
-
-`[dependencies]` in Cargo.toml has:
-
-    portable-pty = "0.10
-
-The closing quote is missing. TOML can't parse this. As committed,
-`cargo build`, `cargo test`, `cargo clippy`, `cargo fmt --check`, and
-`cargo metadata` all fail immediately with a manifest error, before
-touching any source file. This is not a code bug, a test failure, or a
-missing feature. It means every "done" claim resting on "the tests
-pass" or "CI is green" for this project needs to be treated as
-unverified until this line is fixed, because the tooling that would have
-caught it has apparently never run successfully.
-
-Fix: close the string. Check crates.io for the exact intended version
-(pin a full version like `"0.10.1"` rather than the bare `"0.10"`, since
-whoever wrote this may have meant something more specific and the
-missing quote suggests it wasn't checked carefully).
-
-Done when: `cargo metadata --format-version 1` succeeds, and CI (TS-004)
-runs at least once, for real, against this fix.
-
-This blocks TS-004 entirely and should land first, as its own tiny PR,
-so the fix is easy to review and easy to blame if something downstream
-still looks wrong.
-
-
-### TS-036  ci: ci-packaging.yml is not valid YAML and has never run
-
-Kind: bug   Severity: high   Status: open
-
-`.github/workflows/ci-packaging.yml` is plain text: packaging notes and
-instructions, saved with a `.yml` extension in the workflows directory.
-GitHub Actions requires valid YAML to register a workflow, so this file
-has never executed, regardless of what any PR description or commit
-message said it added. The Linux `.deb`/`.rpm` packaging story is
-currently "described in a comment," not "built by CI."
-
-Fix: the actual workflow steps described in the file's own text (build,
-test, `cargo deb`, `packaging/build_rpm.sh` via fpm, upload artifacts,
-run `packaging/acceptance_test.sh`) need to be written as real YAML.
-Keep the original text as documentation (e.g.
-`packaging/ci-packaging-notes.md`) since it's a reasonable description
-of intent, just not executable.
-
-Done when: `.github/workflows/ci-packaging.yml` parses as YAML, runs on
-a real trigger (tag push is reasonable, since packaging every PR is
-wasted work), and produces a downloadable `.deb` and `.rpm` as build
-artifacts on a test run.
-
-Related: TS-033 (release and packaging status), TS-035 (blocks any build
-this workflow would run).
 
 
 ===========================================================================
