@@ -1,42 +1,102 @@
 # Packaging notes
 
-This is the original content of `.github/workflows/ci-packaging.yml`,
-moved here because it was plain text, not YAML — GitHub Actions has
-never been able to run it as a workflow, despite the `.yml` name and
-the `.github/workflows/` path. The real, working workflow is now at
-`.github/workflows/ci-packaging.yml` (rewritten) and this file holds
-the human-readable notes that used to live inline in the broken one.
-
----
-
-This branch adds a CI workflow and helper scripts to produce Linux
-packages (.deb and .rpm) and run basic acceptance tests.
+This repository contains GitHub Actions workflows and helper scripts for
+building Linux packages and running packaging acceptance tests.
 
 ## What was added
 
-- `.github/workflows/ci-packaging.yml`: GitHub Actions workflow that
-  builds the project, runs tests, produces .deb/.rpm packages, uploads
-  them as artifacts, and performs simple acceptance tests.
-- `packaging/build_rpm.sh`: small helper script that uses `fpm` to
-  create an RPM from the release binary.
-- `packaging/acceptance_test.sh`: a tiny smoke-test script (expects
-  `trushell` in PATH).
+- `.github/workflows/ci.yml`: correctness checks including formatting,
+  Clippy, tests, MSRV validation, audit, and dependency checks.
+- `.github/workflows/ci-packaging.yml`: workflow for building `.deb` and
+  `.rpm` packages and testing the packaged binaries.
+- `packaging/build_rpm.sh`: helper script that uses `fpm` to create an RPM
+  from the release binary.
+- `packaging/acceptance_test.sh`: smoke-test script that expects `trushell`
+  to be available in `PATH`.
 
-## What you should check / customize
+## Rust toolchain
 
-- Cargo.toml package metadata: `cargo-deb` derives package metadata
-  from `Cargo.toml` under `[package.metadata.deb]`. Add fields like
-  `maintainer`, `description`, `assets`, etc., to produce richer
-  DEB/RPM metadata.
-- Binary name: scripts assume the built binary is
-  `target/release/trushell`. If your binary name differs, update the
-  workflow and `build_rpm.sh` call accordingly.
-- fpm dependencies: building RPM uses `fpm`; CI installs it via gem. If
-  you prefer `cargo-rpm` or another tool, adjust `packaging/build_rpm.sh`
-  and the workflow.
+The project uses Rust `1.70.0` as its selected MSRV and CI toolchain.
 
-## How to use locally
+`Cargo.toml` must contain:
 
-- Install cargo-deb: `cargo install cargo-deb`
-- Build .deb: `cargo deb`
-- Build .rpm: `./packaging/build_rpm.sh` (requires `fpm`)
+```toml
+[package]
+rust-version = "1.70.0"
+```
+
+`rust-toolchain.toml` must contain:
+
+```toml
+[toolchain]
+channel = "1.70.0"
+components = ["rustfmt", "clippy"]
+```
+
+## Debian package
+
+Install `cargo-deb`:
+
+```sh
+cargo install cargo-deb --locked
+```
+
+Build the Debian package:
+
+```sh
+cargo deb
+```
+
+The package is written to:
+
+```text
+target/debian/*.deb
+```
+
+## RPM package
+
+Install `fpm` and the RPM build tools.
+
+Build the release binary first:
+
+```sh
+cargo build --release
+```
+
+Build the RPM by passing the release binary as the first argument:
+
+```sh
+./packaging/build_rpm.sh target/release/trushell
+```
+
+The RPM is written to:
+
+```text
+target/rpm/*.rpm
+```
+
+The script expects the following usage:
+
+```text
+./packaging/build_rpm.sh <path-to-release-binary> [out-dir]
+```
+
+## Acceptance testing
+
+The acceptance script checks that:
+
+1. `trushell` is available on `PATH`.
+2. `trushell --version` exits successfully.
+3. `trushell -c 'echo packaging-smoke'` exits successfully.
+
+When running locally against the release binary:
+
+```sh
+cargo build --release
+PATH="$PWD/target/release:$PATH" ./packaging/acceptance_test.sh
+```
+
+The packaging workflow runs the acceptance test twice:
+
+- Once after installing the Debian package.
+- Once after extracting the RPM package into a temporary directory.
