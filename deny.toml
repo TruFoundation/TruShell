@@ -1,0 +1,60 @@
+# Config for `cargo deny check`.
+#
+#   cargo install cargo-deny --locked
+#   cargo deny check
+#
+# The allow-list below covers the licenses of the dependencies actually
+# in Cargo.toml as of this writing: anyhow, crossterm, signal-hook, nix,
+# once_cell, libc, nu-ansi-term, unicode-width, vte, serde, serde_json,
+# wasmtime, wat, portable-pty, shlex, globset, shellexpand, reedline.
+#
+# VERIFY: this allow-list is from general knowledge of these crates'
+# licenses (mostly dual MIT/Apache-2.0, wasmtime under Apache-2.0 WITH
+# LLVM-exception), not from actually running cargo-deny against
+# Cargo.lock, since the manifest doesn't parse yet (see
+# CARGO_TOML_PATCH.md part 1) and this environment has no network
+# access to fetch crates.io metadata either way. Run `cargo deny check`
+# for real once the manifest is fixed, and fix this list to match
+# whatever it actually reports — don't assume the list below is correct
+# until then.
+
+[graph]
+targets = []
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+    # "RUSTSEC-0000-0000", # reason, and a date to revisit
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+]
+# GPL-family licenses are deliberately not on the allow list: pulling one
+# in would put us back in the licensing corner that pushed Apple off
+# bash and onto zsh. If cargo deny flags one, bring it to the
+# maintainers (docs/design/goals.md) rather than widening this list.
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = [
+    # { crate = "name", reason = "why, and what to use instead" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
