@@ -1,21 +1,3 @@
-# Correctness gate for TruShell: fmt, clippy, tests, audit, deny.
-#
-# This is a NEW file. It does not touch triage.yml (which is fine as-is)
-# or ci-packaging.yml (which is currently plain text with a .yml
-# extension and has never run as a workflow — see
-# packaging/ci-packaging-notes.md and the new, real
-# .github/workflows/ci-packaging.yml added alongside this one).
-#
-# REQUIRES: Cargo.toml's unterminated `portable-pty = "0.10` string must
-# be fixed first (see CARGO_TOML_PATCH.md), or every job below fails at
-# the "resolve dependencies" step with a manifest-parse error, not a
-# real test failure. Don't spend time debugging job output until that's
-# fixed.
-#
-# NOTE: TruShell is a single package, not a workspace (confirmed:
-# Cargo.toml has no [workspace] table, and examples/plugins/ isn't a
-# member). So this uses plain `cargo test` / `cargo clippy --all-targets`,
-# not `--workspace`.
 name: CI
 
 on:
@@ -38,9 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: dtolnay/rust-toolchain@1.70.0
         with:
           components: rustfmt
+
       - run: cargo fmt --all -- --check
 
   clippy:
@@ -52,16 +36,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: dtolnay/rust-toolchain@1.70.0
         with:
           components: clippy
+
       - uses: Swatinem/rust-cache@v2
+
       - run: cargo clippy --all-targets -- -D warnings
 
-  # Runs the four Rust integration tests that exist today:
-  # tests/dotfiles.rs, tests/posix_compatibility.rs,
-  # tests/terminal_emulator.rs, tests/wasm_plugin.rs — `cargo test` picks
-  # these up on its own, nothing extra to wire in.
   test:
     name: cargo test (${{ matrix.os }})
     strategy:
@@ -71,60 +54,70 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: dtolnay/rust-toolchain@1.70.0
+
       - uses: Swatinem/rust-cache@v2
+
       - run: cargo build --all-targets
       - run: cargo test
 
-  # Separate from `test` above so a stable-only failure and an
-  # MSRV-only failure are easy to tell apart in the PR checks list.
-  #
-  # REQUIRES rust-version to be set in Cargo.toml first (see
-  # CARGO_TOML_PATCH.md, part 2). Until then this job intentionally
-  # fails at the "read MSRV" step rather than silently testing against
-  # "stable" and claiming to be an MSRV check.
   msrv:
     name: cargo build (MSRV)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Read rust-version from Cargo.toml
         id: read
+        shell: bash
         run: |
           msrv=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/.*"([0-9.]+)".*/\1/')
+
           if [ -z "$msrv" ]; then
-            echo "::error::rust-version is not set in Cargo.toml yet. See CARGO_TOML_PATCH.md part 2 — this isn't optional, this job can't do its job without it."
+            echo "::error::rust-version is not set in Cargo.toml"
             exit 1
           fi
+
+          echo "Using MSRV: $msrv"
           echo "msrv=$msrv" >> "$GITHUB_OUTPUT"
+
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.read.outputs.msrv }}
+
       - run: cargo build --all-targets
 
-  # packaging/acceptance_test.sh checks `trushell -c 'echo packaging-smoke'`
-  # against a trushell binary on PATH. It's a standalone script, not
-  # something `cargo test` runs — wire it in explicitly.
   acceptance:
     name: packaging acceptance smoke test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: dtolnay/rust-toolchain@1.70.0
+
       - uses: Swatinem/rust-cache@v2
+
       - run: cargo build --release
+
       - name: Put trushell on PATH
         run: echo "$PWD/target/release" >> "$GITHUB_PATH"
-      - run: chmod +x packaging/acceptance_test.sh
-      - run: ./packaging/acceptance_test.sh
+
+      - name: Run packaging acceptance test
+        run: |
+          chmod +x packaging/acceptance_test.sh
+          ./packaging/acceptance_test.sh
 
   audit:
     name: cargo audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: dtolnay/rust-toolchain@1.70.0
+
       - uses: taiki-e/install-action@cargo-audit
+
       - run: cargo audit
 
   deny:
@@ -132,20 +125,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           log-level: warn
           command: check
 
-  # One status for branch protection to require, so adding a job later
-  # doesn't mean reconfiguring branch protection too.
   ci-ok:
     name: CI ok
     if: always()
     needs: [fmt, clippy, test, msrv, acceptance, audit, deny]
     runs-on: ubuntu-latest
     steps:
-      - run: |
+      - name: Check required jobs
+        shell: bash
+        run: |
           if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || \
              [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
             echo "::error::one or more required CI jobs failed"
