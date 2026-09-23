@@ -1,0 +1,8 @@
+# What `cargo build` etc. use locally when nothing else is specified.
+# This does NOT set the MSRV — that's `rust-version` in Cargo.toml,
+# still unset (see CARGO_TOML_PATCH.md part 2). This just pins day-to-day
+# development to a known-good stable toolchain with the components CI
+# needs (rustfmt, clippy).
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
