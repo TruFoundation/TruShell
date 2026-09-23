@@ -1,17 +1,94 @@
-Packaging notes
+# Rewritten from scratch as real YAML. The previous file at this path
+# was plain text (see packaging/ci-packaging-notes.md for its content)
+# and was never executed by GitHub Actions, despite living here since
+# whatever PR first added it. This is the actual workflow described in
+# those notes: build, test, package as .deb/.rpm, upload artifacts,
+# smoke-test.
+#
+# VERIFY before merging: I don't have packaging/build_rpm.sh's real
+# contents, only its description in the notes ("uses fpm to create an
+# RPM from the release binary"). Confirm its actual invocation (flags,
+# output path) and adjust the "Build .rpm" step below to match exactly.
+# Same for [package.metadata.deb] in Cargo.toml — cargo-deb needs that
+# table to exist with real values (maintainer, description, at least)
+# or it will fail or produce a near-empty package.
+#
+# REQUIRES: Cargo.toml's unterminated `portable-pty = "0.10` string must
+# be fixed first (see CARGO_TOML_PATCH.md) or the build step fails
+# immediately with a manifest-parse error.
+name: Package (deb/rpm)
 
-This branch adds a CI workflow and helper scripts to produce Linux packages (.deb and .rpm) and run basic acceptance tests.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
 
-What was added
-- .github/workflows/ci-packaging.yml: GitHub Actions workflow that builds the project, runs tests, produces .deb/.rpm packages, uploads them as artifacts, and performs simple acceptance tests.
-- packaging/build_rpm.sh: Small helper script that uses fpm to create an RPM from the release binary.
-- packaging/acceptance_test.sh: A tiny smoke-test script (expects trushell in PATH).
+env:
+  CARGO_TERM_COLOR: always
 
-What you should check / customize
-- Cargo.toml package metadata: cargo-deb derives package metadata from Cargo.toml under [package.metadata.deb]. Add fields like maintainer, description, assets, etc., to produce richer DEB/RPM metadata.
-- Binary name: scripts assume the built binary is target/release/trushell. If your binary name differs, update the workflow and build_rpm.sh call accordingly.
-- fpm dependencies: building RPM uses fpm; CI installs it via gem. If you prefer cargo-rpm or another tool, adjust packaging/build_rpm.sh and the workflow.
+jobs:
+  build-and-test:
+    name: Build and test before packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --all-targets
+      - run: cargo test
 
-How to use locally
-- Install cargo-deb: cargo install cargo-deb
-- Build .deb: cargo
+  package-deb:
+    name: Build .deb
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-deb --locked
+      # VERIFY: requires [package.metadata.deb] in Cargo.toml (maintainer,
+      # description, assets at minimum). See packaging/ci-packaging-notes.md.
+      - run: cargo deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trushell-deb
+          path: target/debian/*.deb
+
+  package-rpm:
+    name: Build .rpm
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - name: Install fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential rpm
+          sudo gem install --no-document fpm
+      - name: Build .rpm
+        run: |
+          chmod +x packaging/build_rpm.sh
+          ./packaging/build_rpm.sh
+          # VERIFY: confirm the real output path build_rpm.sh writes to.
+          # This assumes it drops the rpm in packaging/dist/ or similar —
+          # adjust the upload-artifact path below to match.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trushell-rpm
+          path: packaging/**/*.rpm
+
+  acceptance:
+    name: Packaging acceptance smoke test
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - run: echo "$PWD/target/release" >> "$GITHUB_PATH"
+      - run: chmod +x packaging/acceptance_test.sh
+      - run: ./packaging/acceptance_test.sh
