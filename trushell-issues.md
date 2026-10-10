@@ -86,8 +86,7 @@ from documents and haven't been reproduced against the code.
 ## Index
 
     M0 housekeeping
-      TS-004  ci: we have not audited what CI actually checks
-
+      --none--
     M1 core shell
       TS-005  parser: a failed parse runs the line as an external command
       TS-006  parser: command-mode quoting and expansion rules unwritten
@@ -132,106 +131,7 @@ from documents and haven't been reproduced against the code.
 ===========================================================================
 M0: housekeeping
 ===========================================================================
-
-### TS-004  ci: we have not audited what CI actually checks
-
-Kind: infra   Severity: medium   Status: in progress
-
-There is a .github directory and the README says "ensure CI passes", but
-we have not written down what it covers. The v3 sprint added a Linux
-package-build workflow and an acceptance test script, so it isn't empty;
-the question is whether fmt, clippy and the tests run on every PR. A
-shell behaves differently per OS (process groups, terminals, signals), so
-a Linux-only run is not enough. The README also states Rust 1.70 as the
-minimum; nothing we know of tests that.
-
-What we found on closer look, and it's worse than "unaudited":
-
-  - `.github/workflows/ci-packaging.yml` is plain text with a `.yml`
-    name. It has never run as a GitHub Actions workflow. See TS-036.
-  - `.github/workflows/triage.yml` is a real workflow and is fine. It
-    labels PRs; it does not build or test anything.
-  - Cargo.toml has an unterminated string
-    (`portable-pty = "0.10`), so no `cargo` command has ever worked
-    against this manifest as committed. See TS-035. This has to be
-    fixed before any of the below can run at all.
-  - It's a single package, not a workspace. Use plain `cargo test` /
-    `cargo clippy --all-targets`, not `--workspace`.
-  - The real tests are `tests/dotfiles.rs`, `tests/posix_compatibility.rs`,
-    `tests/terminal_emulator.rs`, `tests/wasm_plugin.rs`. `cargo test`
-    picks these up on its own.
-  - The acceptance script is `packaging/acceptance_test.sh`, not
-    `tests/acceptance.sh`. It checks `trushell -c 'echo ...'` against a
-    binary on PATH. Nothing runs it automatically; a workflow has to
-    build the binary, put it on PATH, and call it.
-  - `rust-version` isn't set in Cargo.toml. 1.70 in the README has never
-    actually been tested, since the manifest didn't parse.
-
-Status of the fix: a new `.github/workflows/ci.yml` runs `cargo fmt
---check`, `cargo clippy --all-targets -D warnings` and `cargo test` on
-Linux and macOS, a separate MSRV job that reads `rust-version` from
-Cargo.toml, an acceptance job that builds the binary and runs
-`packaging/acceptance_test.sh`, plus `cargo audit` and `cargo deny`.
-`.github/workflows/ci-packaging.yml` has been rewritten as real YAML
-(TS-036). `rust-toolchain.toml` and `deny.toml` were added.
-`rust-version` still needs to be set by hand once someone determines the
-real MSRV; nobody has been able to build this manifest yet to check.
-
-Second pass (2026-10-10). The "fixes" above had problems of their own,
-found by reading the files and crates.io; still nothing has been built:
-
-  - TS-035's fix set `portable-pty = "0.10"`. No 0.10 was ever published
-    (newest is 0.9.0), so the manifest still could not resolve. Now
-    `"0.9"`. Nothing in src/ uses portable-pty, shlex, globset or
-    shellexpand yet.
-  - `rust-version = "1.70.0"` had been set anyway, untested. It can't be
-    right as committed: Cargo.lock is lockfile v4, which only cargo
-    >= 1.78 reads. Left as is with an UNVERIFIED comment; a new manual
-    workflow, `.github/workflows/msrv-find.yml`, runs `cargo msrv find`
-    to get the real number.
-  - `rust-toolchain.toml` pinned 1.70.0. That file overrides the
-    toolchain a CI step installs, so every job would have run 1.70 and
-    failed on the lockfile. Now `stable`; the msrv job calls `cargo
-    +<msrv>` explicitly. ci.yml and ci-packaging.yml use stable too.
-  - Cargo.lock is stale: no entries for portable-pty or reedline. CI does
-    not use `--locked`, and the audit job runs `cargo fetch` first.
-  - The acceptance script only checked exit status. main.rs ignores argv,
-    so `trushell --version` and `trushell -c ...` start the REPL, read
-    EOF and exit 0: a false pass. It now checks output, with stdin
-    /dev/null and a timeout. It will fail until TS-016 adds `--version`
-    and `-c`.
-  - build_rpm.sh's output path, target/rpm/trushell_<ver>_x86_64.rpm,
-    matches the upload glob. But fpm installed the binary at
-    /usr/local/bin/target/release/trushell; now /usr/local/bin/trushell.
-  - Added `[package.metadata.deb]`, plus `license = "Apache-2.0"` (matches
-    LICENSE.md) and `description` to Cargo.toml.
-  - CARGO_TOML_PATCH.md, referenced above, does not exist in the repo.
-
-Still to do:
-
-  - commit a regenerated Cargo.lock (`cargo generate-lockfile` or any
-    `cargo build`) and run `cargo fmt`; main.rs has unsorted imports that
-    `cargo fmt --check` will likely reject
-  - run the "MSRV find" workflow and set `rust-version` in Cargo.toml to
-    what it reports
-  - implement `--version` and `-c` (TS-016) so the acceptance job can pass,
-    then also run packaging/acceptance_test.sh against the installed
-    packages in ci-packaging.yml (it only checks the install paths now)
-  - run `cargo deny check` for real and correct deny.toml's license
-    allow-list against what it actually reports
-  - check that `cargo deb` and the RPM job produce installable packages
-    (trigger ci-packaging.yml by hand)
-  - require the `CI ok` status check in Settings → Branches → main, once
-    the jobs above are green
-
-Done when: fmt, clippy, test (Linux + macOS), the MSRV build, the
-packaging acceptance smoke test, audit and deny all run on every PR
-against a manifest that actually parses, are required by branch
-protection, and Cargo.toml's rust-version matches a Rust version someone
-has actually built successfully. Windows is out of scope for now, and
-the README says so.
-
-
+---none---
 
 ===========================================================================
 M1: core shell
