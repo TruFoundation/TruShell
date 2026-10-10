@@ -21,7 +21,7 @@ if ! command -v trushell >/dev/null 2>&1; then
   exit 2
 fi
 
-if out=$(run trushell --version 2>&1) && grep -Eq '[0-9]+\.[0-9]+\.[0-9]+' <<<"$out"; then
+if out=$(run trushell --version 2>&1) && grep -Eq '^(trushell[[:space:]]+)?v?[0-9]+\.[0-9]+\.[0-9]+' <<<"$out"; then
   echo "Version check succeeded: $out"
 else
   echo "trushell --version did not print a version. Output was:"
