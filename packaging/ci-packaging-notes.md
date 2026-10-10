@@ -86,7 +86,8 @@ cargo build --release
 PATH="$PWD/target/release:$PATH" ./packaging/acceptance_test.sh
 ```
 
-The packaging workflow runs the acceptance test twice:
-
-- Once after installing the Debian package.
-- Once after extracting the RPM package into a temporary directory.
+CI runs it on every PR (the `acceptance` job in `ci.yml`). The packaging
+workflow does not run it yet; it only checks that the Debian package
+installs an executable `/usr/bin/trushell` and that the RPM contains an
+executable `/usr/local/bin/trushell`. Once TS-016 lands and the script
+passes, add it after each of those checks in `ci-packaging.yml`.
