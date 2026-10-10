@@ -175,22 +175,52 @@ Cargo.toml, an acceptance job that builds the binary and runs
 `.github/workflows/ci-packaging.yml` has been rewritten as real YAML
 (TS-036). `rust-toolchain.toml` and `deny.toml` were added.
 `rust-version` still needs to be set by hand once someone determines the
-real MSRV (see CARGO_TOML_PATCH.md); nobody has been able to build this
-manifest yet to check.
+real MSRV; nobody has been able to build this manifest yet to check.
+
+Second pass (2026-10-10). The "fixes" above had problems of their own,
+found by reading the files and crates.io; still nothing has been built:
+
+  - TS-035's fix set `portable-pty = "0.10"`. No 0.10 was ever published
+    (newest is 0.9.0), so the manifest still could not resolve. Now
+    `"0.9"`. Nothing in src/ uses portable-pty, shlex, globset or
+    shellexpand yet.
+  - `rust-version = "1.70.0"` had been set anyway, untested. It can't be
+    right as committed: Cargo.lock is lockfile v4, which only cargo
+    >= 1.78 reads. Left as is with an UNVERIFIED comment; a new manual
+    workflow, `.github/workflows/msrv-find.yml`, runs `cargo msrv find`
+    to get the real number.
+  - `rust-toolchain.toml` pinned 1.70.0. That file overrides the
+    toolchain a CI step installs, so every job would have run 1.70 and
+    failed on the lockfile. Now `stable`; the msrv job calls `cargo
+    +<msrv>` explicitly. ci.yml and ci-packaging.yml use stable too.
+  - Cargo.lock is stale: no entries for portable-pty or reedline. CI does
+    not use `--locked`, and the audit job runs `cargo fetch` first.
+  - The acceptance script only checked exit status. main.rs ignores argv,
+    so `trushell --version` and `trushell -c ...` start the REPL, read
+    EOF and exit 0: a false pass. It now checks output, with stdin
+    /dev/null and a timeout. It will fail until TS-016 adds `--version`
+    and `-c`.
+  - build_rpm.sh's output path, target/rpm/trushell_<ver>_x86_64.rpm,
+    matches the upload glob. But fpm installed the binary at
+    /usr/local/bin/target/release/trushell; now /usr/local/bin/trushell.
+  - Added `[package.metadata.deb]`, plus `license = "Apache-2.0"` (matches
+    LICENSE.md) and `description` to Cargo.toml.
+  - CARGO_TOML_PATCH.md, referenced above, does not exist in the repo.
 
 Still to do:
 
-  - fix Cargo.toml's unterminated string first (TS-035), or nothing else
-    in this list can even be attempted
-  - determine the real MSRV (`cargo +1.70.0 build`, or older/newer until
-    one works) and set `rust-version` in Cargo.toml to match
-  - fill in `[package.metadata.deb]` in Cargo.toml so `cargo deb` (used
-    by the packaging workflow) produces a real package
-  - confirm `packaging/build_rpm.sh`'s actual output path and fix the
-    artifact-upload step in ci-packaging.yml to match
-  - run `cargo deny check` for real once the manifest parses, and correct
-    deny.toml's license allow-list against what it actually reports
-  - require the `CI ok` status check in Settings → Branches → main
+  - commit a regenerated Cargo.lock (`cargo generate-lockfile` or any
+    `cargo build`) and run `cargo fmt`; main.rs has unsorted imports that
+    `cargo fmt --check` will likely reject
+  - run the "MSRV find" workflow and set `rust-version` in Cargo.toml to
+    what it reports
+  - implement `--version` and `-c` (TS-016) so the acceptance job can pass
+  - run `cargo deny check` for real and correct deny.toml's license
+    allow-list against what it actually reports
+  - check that `cargo deb` and the RPM job produce installable packages
+    (trigger ci-packaging.yml by hand)
+  - require the `CI ok` status check in Settings → Branches → main, once
+    the jobs above are green
 
 Done when: fmt, clippy, test (Linux + macOS), the MSRV build, the
 packaging acceptance smoke test, audit and deny all run on every PR

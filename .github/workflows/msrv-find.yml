@@ -1,0 +1,44 @@
+name: MSRV find
+
+# Determines the oldest Rust toolchain that actually builds this crate
+# (with the committed Cargo.lock), so `rust-version` in Cargo.toml can be
+# set to a version someone has really built with (TS-004). Run it by hand
+# from the Actions tab, then put the reported version in Cargo.toml; the
+# `msrv` job in ci.yml keeps it honest from then on.
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  find:
+    name: cargo msrv find
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
+
+      # Bisects over released toolchains with `rustup run <ver> cargo check`,
+      # which bypasses rust-toolchain.toml.
+      - shell: bash
+        run: |
+          set -o pipefail
+          cargo msrv find --min 1.60.0 2>&1 | tee msrv.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## cargo msrv find'
+            echo '```'
+            tail -n 40 msrv.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

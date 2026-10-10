@@ -22,7 +22,8 @@ expert. Being careful helps more than being clever.
     cargo build
     cargo test
 
-You need Rust 1.70 or newer.
+You need current stable Rust (edition 2021). The minimum supported version
+has not been verified yet; see TS-004.
 
 
 ## Picking something to work on

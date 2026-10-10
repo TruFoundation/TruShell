@@ -30,6 +30,9 @@ BASENAME=$(basename "$BINARY_PATH")
 # Ensure binary is executable
 chmod +x "$BINARY_PATH" || true
 
-fpm -s dir -t rpm -n trushell -v "$VERSION" --prefix /usr/local/bin "$BINARY_PATH" -p "$OUT_DIR/trushell_${VERSION}_x86_64.rpm"
+# "src=dest" so the binary lands at /usr/local/bin/trushell. Passing the
+# bare path with --prefix would install it at
+# /usr/local/bin/target/release/trushell, which is not on anyone's PATH.
+fpm -s dir -t rpm -n trushell -v "$VERSION" --prefix /usr/local/bin   "$BINARY_PATH=trushell" -p "$OUT_DIR/trushell_${VERSION}_x86_64.rpm"
 
 echo "RPM created in $OUT_DIR"
