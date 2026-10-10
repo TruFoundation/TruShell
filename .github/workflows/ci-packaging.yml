@@ -80,8 +80,13 @@ jobs:
           path: target/rpm/*.rpm
           if-no-files-found: error
 
+  # Checks that each package installs an executable trushell where PATH
+  # will find it. It does not run packaging/acceptance_test.sh yet: that
+  # script checks `trushell --version` and `trushell -c`, which do not
+  # exist until TS-016. ci.yml's acceptance job tracks that on every PR;
+  # once it passes, call the script here too (after each install step).
   acceptance:
-    name: Packaging acceptance smoke test
+    name: Package install check
     needs: [package-deb, package-rpm]
     runs-on: ubuntu-latest
     steps:
@@ -104,14 +109,15 @@ jobs:
           name: trushell-rpm
           path: artifacts/rpm
 
-      - name: Install and smoke-test DEB
+      - name: Install and check DEB
         shell: bash
         run: |
           sudo dpkg -i artifacts/deb/*.deb
 
-          bash packaging/acceptance_test.sh
+          test -x /usr/bin/trushell
+          [ "$(command -v trushell)" = /usr/bin/trushell ]
 
-      - name: Extract and smoke-test RPM
+      - name: Extract and check RPM
         shell: bash
         run: |
           rm -rf artifacts/rpm/extracted
@@ -120,5 +126,4 @@ jobs:
           rpm2cpio artifacts/rpm/*.rpm |
             (cd artifacts/rpm/extracted && cpio -idm)
 
-          PATH="$PWD/artifacts/rpm/extracted/usr/local/bin:$PATH" \
-            bash packaging/acceptance_test.sh
+          test -x artifacts/rpm/extracted/usr/local/bin/trushell

@@ -214,7 +214,9 @@ Still to do:
     `cargo fmt --check` will likely reject
   - run the "MSRV find" workflow and set `rust-version` in Cargo.toml to
     what it reports
-  - implement `--version` and `-c` (TS-016) so the acceptance job can pass
+  - implement `--version` and `-c` (TS-016) so the acceptance job can pass,
+    then also run packaging/acceptance_test.sh against the installed
+    packages in ci-packaging.yml (it only checks the install paths now)
   - run `cargo deny check` for real and correct deny.toml's license
     allow-list against what it actually reports
   - check that `cargo deb` and the RPM job produce installable packages
