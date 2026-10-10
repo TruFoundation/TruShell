@@ -1,5 +1,21 @@
 name: CI
 
+# What this checks, on every PR and every push to main (TS-004):
+#   fmt         cargo fmt --check
+#   clippy      cargo clippy --all-targets -D warnings   (Linux, macOS)
+#   test        cargo test                               (Linux, macOS)
+#   msrv        cargo +<rust-version from Cargo.toml> build --all-targets
+#   acceptance  release build on PATH + packaging/acceptance_test.sh
+#   audit       cargo audit (RustSec advisories)
+#   deny        cargo deny check (licenses, bans, advisories, sources)
+#   CI ok       aggregate; this is the one branch protection should require
+#
+# Windows is out of scope for now (see README).
+#
+# rust-toolchain.toml pins the default toolchain to stable and overrides
+# whatever a setup step installs, so the MSRV job calls `cargo +<msrv>`
+# explicitly rather than relying on the installed default.
+
 on:
   push:
     branches: [main]
@@ -12,16 +28,16 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
 
 jobs:
   fmt:
     name: cargo fmt --check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
 
@@ -34,10 +50,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
@@ -52,19 +69,20 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo build --all-targets
-      - run: cargo test
+      - run: cargo test --all-targets
 
   msrv:
     name: cargo build (MSRV)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -86,15 +104,21 @@ jobs:
         with:
           toolchain: ${{ steps.read.outputs.msrv }}
 
-      - run: cargo build --all-targets
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-${{ steps.read.outputs.msrv }}
+
+      # Explicit +toolchain: rust-toolchain.toml would otherwise win.
+      - run: cargo +${{ steps.read.outputs.msrv }} build --all-targets
 
   acceptance:
     name: packaging acceptance smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
 
@@ -104,25 +128,31 @@ jobs:
         run: echo "$PWD/target/release" >> "$GITHUB_PATH"
 
       - name: Run packaging acceptance test
-        run: |
-          chmod +x packaging/acceptance_test.sh
-          ./packaging/acceptance_test.sh
+        run: bash packaging/acceptance_test.sh
 
   audit:
     name: cargo audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
 
-      - uses: taiki-e/install-action@cargo-audit
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # Brings Cargo.lock in line with Cargo.toml first, so the audit
+      # covers every dependency and not just what the lockfile lists.
+      - run: cargo fetch
 
       - run: cargo audit
 
   deny:
     name: cargo deny (licenses, bans, advisories, sources)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -141,7 +171,8 @@ jobs:
         shell: bash
         run: |
           if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || \
-             [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
-            echo "::error::one or more required CI jobs failed"
+             [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ] || \
+             [ "${{ contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "::error::one or more required CI jobs did not succeed"
             exit 1
           fi

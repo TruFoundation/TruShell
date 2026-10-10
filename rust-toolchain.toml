@@ -1,8 +1,12 @@
 # What `cargo build` etc. use locally when nothing else is specified.
-# This does NOT set the MSRV — that's `rust-version` in Cargo.toml,
-# still unset (see CARGO_TOML_PATCH.md part 2). This just pins day-to-day
-# development to a known-good stable toolchain with the components CI
-# needs (rustfmt, clippy).
+# This does NOT set the MSRV -- that's `rust-version` in Cargo.toml, which
+# CI checks separately with an explicit `cargo +<msrv>`.
+#
+# Note that this file overrides whatever toolchain a CI step installs, so
+# it must name a toolchain that actually builds the crate. It was pinned to
+# 1.70.0, which cannot even read the committed Cargo.lock (lockfile v4
+# needs cargo >= 1.78), so every CI job would have failed regardless of
+# which toolchain the workflow asked for.
 [toolchain]
-channel = "1.70.0"
+channel = "stable"
 components = ["rustfmt", "clippy"]

@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_TOOLCHAIN: 1.70.0
 
 jobs:
   build-and-test:
@@ -17,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
 
@@ -31,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
 
@@ -55,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.70.0
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
 
@@ -70,8 +69,9 @@ jobs:
 
       - name: Build .rpm
         run: |
-          chmod +x packaging/build_rpm.sh
-          ./packaging/build_rpm.sh target/release/trushell
+          # Writes target/rpm/trushell_<version>_x86_64.rpm, which the
+          # upload step below picks up.
+          bash packaging/build_rpm.sh target/release/trushell
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
@@ -109,8 +109,7 @@ jobs:
         run: |
           sudo dpkg -i artifacts/deb/*.deb
 
-          chmod +x packaging/acceptance_test.sh
-          ./packaging/acceptance_test.sh
+          bash packaging/acceptance_test.sh
 
       - name: Extract and smoke-test RPM
         shell: bash
@@ -122,4 +121,4 @@ jobs:
             (cd artifacts/rpm/extracted && cpio -idm)
 
           PATH="$PWD/artifacts/rpm/extracted/usr/local/bin:$PATH" \
-            ./packaging/acceptance_test.sh
+            bash packaging/acceptance_test.sh

@@ -16,22 +16,14 @@ building Linux packages and running packaging acceptance tests.
 
 ## Rust toolchain
 
-The project uses Rust `1.70.0` as its selected MSRV and CI toolchain.
+CI builds with stable Rust. `rust-toolchain.toml` pins local and CI
+builds to `stable`; it overrides whatever toolchain a workflow step
+installs, so it must name a toolchain that can build the crate.
 
-`Cargo.toml` must contain:
-
-```toml
-[package]
-rust-version = "1.70.0"
-```
-
-`rust-toolchain.toml` must contain:
-
-```toml
-[toolchain]
-channel = "1.70.0"
-components = ["rustfmt", "clippy"]
-```
+`rust-version` in `Cargo.toml` (the MSRV) has not been verified yet. Run
+the "MSRV find" workflow from the Actions tab and set `rust-version` to
+what it reports. The `msrv` job in `ci.yml` then builds with exactly that
+version on every PR.
 
 ## Debian package
 
@@ -47,11 +39,8 @@ Build the Debian package:
 cargo deb
 ```
 
-The package is written to:
-
-```text
-target/debian/*.deb
-```
+The package is written to `target/debian/*.deb` and installs the binary
+at `/usr/bin/trushell` (see `[package.metadata.deb]` in `Cargo.toml`).
 
 ## RPM package
 
@@ -69,11 +58,8 @@ Build the RPM by passing the release binary as the first argument:
 ./packaging/build_rpm.sh target/release/trushell
 ```
 
-The RPM is written to:
-
-```text
-target/rpm/*.rpm
-```
+The RPM is written to `target/rpm/trushell_<version>_x86_64.rpm` and
+installs the binary at `/usr/local/bin/trushell`.
 
 The script expects the following usage:
 
@@ -86,8 +72,12 @@ The script expects the following usage:
 The acceptance script checks that:
 
 1. `trushell` is available on `PATH`.
-2. `trushell --version` exits successfully.
-3. `trushell -c 'echo packaging-smoke'` exits successfully.
+2. `trushell --version` prints a version number.
+3. `trushell -c 'echo packaging-smoke'` prints `packaging-smoke`.
+
+It checks output, not just exit status: a `trushell` that ignores its
+arguments drops into the REPL, reads EOF and exits 0. Neither `--version`
+nor `-c` is implemented yet (TS-016), so this check fails until they are.
 
 When running locally against the release binary:
 

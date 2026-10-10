@@ -2,8 +2,14 @@
 name = "trushell"
 version = "0.1.0"
 edition = "2021"
+# UNVERIFIED: nobody has built with 1.70 yet, and the committed Cargo.lock
+# is lockfile v4, which needs cargo >= 1.78. Run the "MSRV find" workflow
+# (.github/workflows/msrv-find.yml) and set this to what it reports (TS-004).
 rust-version = "1.70.0"
 authors = ["TruFoundation"]
+description = "A POSIX-leaning shell with a typed language and WASM plugins"
+license = "Apache-2.0"
+repository = "https://github.com/TruFoundation/TruShell"
 
 [dependencies]
 anyhow = "1.0"
@@ -21,10 +27,23 @@ wasmtime = "11"
 wat = "1.0"
 
 # PTY-backed job support
-portable-pty = "0.10"
+# 0.9.0 is the newest release; "0.10" (TS-035's fix) was never published.
+portable-pty = "0.9"
 # tokenization / globbing
 shlex = "1.1"
 globset = "0.4"
 shellexpand = "2.1"
 # REPL line editing and persistent history
 reedline = "0.10"
+
+# Used by `cargo deb` in .github/workflows/ci-packaging.yml.
+[package.metadata.deb]
+maintainer = "TruFoundation"
+copyright = "TruFoundation"
+section = "shells"
+priority = "optional"
+extended-description = "TruShell is an experimental shell. Packages are built by CI from tagged releases."
+assets = [
+    ["target/release/trushell", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/trushell/README.md", "644"],
+]

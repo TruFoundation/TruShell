@@ -11,9 +11,9 @@
 # VERIFY: this allow-list is from general knowledge of these crates'
 # licenses (mostly dual MIT/Apache-2.0, wasmtime under Apache-2.0 WITH
 # LLVM-exception), not from actually running cargo-deny against
-# Cargo.lock, since the manifest doesn't parse yet (see
-# CARGO_TOML_PATCH.md part 1) and this environment has no network
-# access to fetch crates.io metadata either way. Run `cargo deny check`
+# Cargo.lock, since the manifest has not resolved yet (see
+# TS-035) and nobody running this has had a working cargo either way.
+# Run `cargo deny check`
 # for real once the manifest is fixed, and fix this list to match
 # whatever it actually reports — don't assume the list below is correct
 # until then.

@@ -116,7 +116,8 @@ list.
 
 ## Try it
 
-You need Rust 1.70 or newer (edition 2021).
+You need current stable Rust (edition 2021). The minimum supported version
+has not been verified yet; see TS-004.
 
     git clone https://github.com/TruFoundation/TruShell.git
     cd TruShell
